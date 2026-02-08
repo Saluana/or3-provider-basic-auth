@@ -4,6 +4,7 @@
   "description": "Basic-authentication provider for OR3 Chat with SSR session resolution, secure cookies, and provider-owned auth UI.",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/types.d.mts",
@@ -27,11 +28,14 @@
     "dist"
   ],
   "scripts": {
-    "prepack": "nuxt-module-build build",
+    "prepack": "bun run build",
     "build": "nuxt-module-build build",
     "lint": "eslint \"src/**/*.{ts,d.ts,vue}\"",
     "type-check": "tsc -p tsconfig.typecheck.json --noEmit",
     "test": "vitest run"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
