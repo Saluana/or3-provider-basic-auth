@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { defineEventHandler, type H3Event } from 'h3';
+import { defineEventHandler, getQuery, type H3Event } from 'h3';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
 import { createSessionExpiredError } from '../../lib/errors';
@@ -24,23 +24,30 @@ export async function handleRefresh(event: H3Event) {
   noStore(event);
   enforceMutationOriginPolicy(event);
   enforceBasicAuthRateLimit(event, 'basic-auth:refresh');
+  const query = getQuery(event);
+  const silent = query.silent === '1' || query.silent === 'true';
+
+  const failExpired = () => {
+    clearAuthCookies(event);
+    if (silent) {
+      return { ok: false as const };
+    }
+    throw createSessionExpiredError();
+  };
 
   const refreshToken = getRefreshTokenFromEvent(event);
   if (!refreshToken) {
-    clearAuthCookies(event);
-    throw createSessionExpiredError();
+    return failExpired();
   }
 
   const claims = await verifyRefreshToken(refreshToken);
   if (!claims) {
-    clearAuthCookies(event);
-    throw createSessionExpiredError();
+    return failExpired();
   }
 
   const account = findAccountById(claims.sub);
   if (!account || account.token_version !== claims.ver) {
-    clearAuthCookies(event);
-    throw createSessionExpiredError();
+    return failExpired();
   }
 
   const config = getBasicAuthConfig();
@@ -61,8 +68,7 @@ export async function handleRefresh(event: H3Event) {
   });
 
   if (!rotation.ok || rotation.accountId !== account.id) {
-    clearAuthCookies(event);
-    throw createSessionExpiredError();
+    return failExpired();
   }
 
   const accessToken = await signAccessToken({

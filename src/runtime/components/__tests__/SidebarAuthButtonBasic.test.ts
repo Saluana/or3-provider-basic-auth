@@ -23,7 +23,7 @@ describe('SidebarAuthButtonBasic', () => {
         return { session: null };
       }
 
-      if (url === '/api/basic-auth/refresh') {
+      if (url === '/api/basic-auth/refresh?silent=1') {
         return { ok: false };
       }
 
@@ -45,9 +45,8 @@ describe('SidebarAuthButtonBasic', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Login');
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', {
-      method: 'POST',
-      ignoreResponseError: true
+    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
+      method: 'POST'
     });
   });
 
@@ -82,16 +81,15 @@ describe('SidebarAuthButtonBasic', () => {
 
     expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Login');
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/basic-auth/refresh', {
-      method: 'POST',
-      ignoreResponseError: true
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
+      method: 'POST'
     });
   });
 
   it('silently refreshes tokens when session endpoint returns null', async () => {
     let sessionCalls = 0;
     const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/basic-auth/refresh') {
+      if (url === '/api/basic-auth/refresh?silent=1') {
         return { ok: true };
       }
 
@@ -132,9 +130,8 @@ describe('SidebarAuthButtonBasic', () => {
     await flushPromises();
     await wrapper.vm.$nextTick();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', {
-      method: 'POST',
-      ignoreResponseError: true
+    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
+      method: 'POST'
     });
     expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
   });

@@ -78,9 +78,8 @@ async function tryRefreshTokens(): Promise<boolean> {
 
   refreshRequest = (async () => {
     try {
-      const response = await $fetch<{ ok?: boolean }>('/api/basic-auth/refresh', {
-        method: 'POST',
-        ignoreResponseError: true
+      const response = await $fetch<{ ok?: boolean }>('/api/basic-auth/refresh?silent=1', {
+        method: 'POST'
       });
       return response?.ok === true;
     } catch {
