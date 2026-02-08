@@ -1,7 +1,5 @@
 declare module '~~/server/auth/registry' {
-  export function registerAuthProvider(input: {
-    id: string;
-    order?: number;
-    create: () => unknown;
-  }): void;
+  import type { AuthProviderRegistryItem } from '~~/server/auth/types';
+
+  export function registerAuthProvider(input: AuthProviderRegistryItem): void;
 }

@@ -2,6 +2,10 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { getRequestHeader, type H3Event } from 'h3';
 import type { BasicAuthAccount, BasicAuthSession } from '../db/schema';
 import { getBasicAuthDb } from '../db/client';
+import {
+  getClientIp as getProxyClientIp,
+  normalizeProxyTrustConfig
+} from './request-identity';
 
 export interface CreateAccountInput {
   email: string;
@@ -59,8 +63,9 @@ function safeHexEquals(left: string, right: string): boolean {
 }
 
 export function getSessionMetadataFromEvent(event: H3Event): SessionMetadata {
+  const proxyConfig = normalizeProxyTrustConfig(useRuntimeConfig(event).security?.proxy);
   return {
-    ipAddress: event.node.req.socket.remoteAddress ?? null,
+    ipAddress: getProxyClientIp(event, proxyConfig) ?? event.node.req.socket.remoteAddress ?? null,
     userAgent: getRequestHeader(event, 'user-agent') ?? null
   };
 }

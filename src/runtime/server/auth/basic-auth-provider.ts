@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import type { AuthProvider } from '~~/server/auth/types';
 import { BASIC_AUTH_PROVIDER_ID } from '../../lib/constants';
 import { getAccessTokenFromEvent, verifyAccessToken } from '../lib/jwt';
 import {
@@ -7,26 +8,10 @@ import {
   isSessionUsable
 } from '../lib/session-store';
 
-interface BasicProviderSession {
-  provider: string;
-  user: {
-    id: string;
-    email?: string;
-    displayName?: string;
-  };
-  expiresAt: Date;
-  claims?: Record<string, unknown>;
-}
-
-interface BasicAuthProviderContract {
-  name: string;
-  getSession(event: H3Event): Promise<BasicProviderSession | null>;
-}
-
-export const basicAuthProvider: BasicAuthProviderContract = {
+export const basicAuthProvider: AuthProvider = {
   name: BASIC_AUTH_PROVIDER_ID,
 
-  async getSession(event: H3Event): Promise<BasicProviderSession | null> {
+  async getSession(event: H3Event) {
     const accessToken = getAccessTokenFromEvent(event);
     if (!accessToken) {
       return null;

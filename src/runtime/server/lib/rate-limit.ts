@@ -1,4 +1,8 @@
-import { createError, getRequestHeader, setResponseHeader, type H3Event } from 'h3';
+import { createError, setResponseHeader, type H3Event } from 'h3';
+import {
+  getClientIp as getProxyClientIp,
+  normalizeProxyTrustConfig
+} from './request-identity';
 
 type Operation = 'basic-auth:sign-in' | 'basic-auth:refresh' | 'basic-auth:sign-out' | 'basic-auth:change-password';
 
@@ -19,31 +23,45 @@ const RULES: Record<Operation, RateLimitRule> = {
 };
 
 const store = new Map<string, Entry>();
+const MAX_WINDOW_MS = Math.max(...Object.values(RULES).map((rule) => rule.windowMs));
+const SWEEP_INTERVAL_MS = 60_000;
+let lastSweepAt = 0;
 
 function getClientIp(event: H3Event): string {
   const runtimeConfig = useRuntimeConfig(event);
-  const trustProxy = runtimeConfig.security?.proxy?.trustProxy === true;
-
-  if (trustProxy) {
-    const forwardedFor = getRequestHeader(event, 'x-forwarded-for');
-    const firstIp = forwardedFor?.split(',')[0]?.trim();
-    if (firstIp && firstIp.length > 0) {
-      return firstIp;
-    }
-    return 'unknown';
-  }
-
-  return event.node.req.socket.remoteAddress ?? 'unknown';
+  const proxyConfig = normalizeProxyTrustConfig(runtimeConfig.security?.proxy);
+  return getProxyClientIp(event, proxyConfig) ?? event.node.req.socket.remoteAddress ?? 'unknown';
 }
 
 function getKey(subject: string, operation: Operation): string {
   return `${subject}:${operation}`;
 }
 
+function pruneRateLimitStore(now: number): void {
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) {
+    return;
+  }
+
+  const cutoff = now - MAX_WINDOW_MS;
+  for (const [key, entry] of store) {
+    const recent = entry.timestamps.filter((timestamp) => timestamp > cutoff);
+    if (recent.length === 0) {
+      store.delete(key);
+      continue;
+    }
+
+    entry.timestamps = recent;
+  }
+
+  lastSweepAt = now;
+}
+
 export function enforceBasicAuthRateLimit(event: H3Event, operation: Operation): void {
+  const now = Date.now();
+  pruneRateLimitStore(now);
+
   const subject = getClientIp(event);
   const key = getKey(subject, operation);
-  const now = Date.now();
   const rule = RULES[operation];
   const windowStart = now - rule.windowMs;
 
@@ -78,4 +96,9 @@ export function enforceBasicAuthRateLimit(event: H3Event, operation: Operation):
 
 export function resetBasicAuthRateLimitStore(): void {
   store.clear();
+  lastSweepAt = 0;
+}
+
+export function getBasicAuthRateLimitStoreSizeForTests(): number {
+  return store.size;
 }

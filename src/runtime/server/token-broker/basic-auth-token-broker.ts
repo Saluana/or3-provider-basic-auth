@@ -1,13 +1,8 @@
 import type { H3Event } from 'h3';
-
-interface ProviderTokenRequest {
-  providerId: string;
-  template?: string;
-}
-
-interface ProviderTokenBroker {
-  getProviderToken(event: H3Event, req: ProviderTokenRequest): Promise<string | null>;
-}
+import type {
+  ProviderTokenBroker,
+  ProviderTokenRequest
+} from '~~/server/auth/token-broker/types';
 
 export class BasicAuthTokenBroker implements ProviderTokenBroker {
   async getProviderToken(

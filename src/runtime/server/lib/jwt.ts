@@ -94,7 +94,9 @@ function isRefreshClaims(payload: JwtPayload): payload is BasicRefreshTokenClaim
 export async function verifyAccessToken(token: string): Promise<BasicAccessTokenClaims | null> {
   try {
     const config = getBasicAuthConfig();
-    const payload = jwt.verify(token, config.jwtSecret) as JwtPayload;
+    const payload = jwt.verify(token, config.jwtSecret, {
+      algorithms: ['HS256']
+    }) as JwtPayload;
     if (!isAccessClaims(payload)) return null;
     return payload;
   } catch {
@@ -105,7 +107,9 @@ export async function verifyAccessToken(token: string): Promise<BasicAccessToken
 export async function verifyRefreshToken(token: string): Promise<BasicRefreshTokenClaims | null> {
   try {
     const config = getBasicAuthConfig();
-    const payload = jwt.verify(token, config.refreshSecret) as JwtPayload;
+    const payload = jwt.verify(token, config.refreshSecret, {
+      algorithms: ['HS256']
+    }) as JwtPayload;
     if (!isRefreshClaims(payload)) return null;
     return payload;
   } catch {

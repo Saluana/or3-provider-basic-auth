@@ -1,4 +1,5 @@
 import { createError, getRequestHeader, type H3Event } from 'h3';
+import { getProxyRequestHost, normalizeProxyTrustConfig } from './request-identity';
 
 function getOriginHost(originOrReferer: string): string | null {
   try {
@@ -14,21 +15,8 @@ function normalizeHost(host: string): string {
 
 function getRequestHost(event: H3Event): string | null {
   const runtimeConfig = useRuntimeConfig(event);
-  const trustProxy = runtimeConfig.security?.proxy?.trustProxy === true;
-
-  if (trustProxy) {
-    const forwardedHost = getRequestHeader(event, 'x-forwarded-host');
-    if (forwardedHost) {
-      const [firstHost] = forwardedHost.split(',');
-      if (firstHost && firstHost.length > 0) {
-        return normalizeHost(firstHost);
-      }
-    }
-    return null;
-  }
-
-  const host = getRequestHeader(event, 'host');
-  return host ? normalizeHost(host) : null;
+  const proxyConfig = normalizeProxyTrustConfig(runtimeConfig.security?.proxy);
+  return getProxyRequestHost(event, proxyConfig);
 }
 
 function isSafeMethod(method?: string): boolean {

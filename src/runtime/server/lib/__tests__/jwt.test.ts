@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import jwt from 'jsonwebtoken';
 import {
   getAccessTokenFromEvent,
   hashRefreshToken,
@@ -85,6 +86,24 @@ describe('jwt helpers', () => {
     process.env.OR3_BASIC_AUTH_REFRESH_SECRET = 'different-secret';
 
     await expect(verifyRefreshToken(token)).resolves.toBeNull();
+  });
+
+  it('rejects tokens signed with unsupported algorithms', async () => {
+    const token = jwt.sign(
+      {
+        sid: 'session-1',
+        ver: 0,
+        typ: 'access'
+      },
+      process.env.OR3_BASIC_AUTH_JWT_SECRET!,
+      {
+        algorithm: 'HS384',
+        subject: 'user-1',
+        expiresIn: 60
+      }
+    );
+
+    await expect(verifyAccessToken(token)).resolves.toBeNull();
   });
 
   it('extracts access token from cookie header', () => {

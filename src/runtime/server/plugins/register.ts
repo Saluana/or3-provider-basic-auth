@@ -5,7 +5,7 @@ import { basicAuthProvider } from '../auth/basic-auth-provider';
 import { createBasicAuthTokenBroker } from '../token-broker/basic-auth-token-broker';
 import { getBasicAuthConfig, validateBasicAuthConfig } from '../lib/config';
 import { hashPassword } from '../lib/password';
-import { ensureBootstrapAccount } from '../lib/session-store';
+import { ensureBootstrapAccount, findAccountByEmail } from '../lib/session-store';
 
 async function ensureBootstrapUserIfConfigured(): Promise<void> {
   const config = getBasicAuthConfig();
@@ -13,6 +13,10 @@ async function ensureBootstrapUserIfConfigured(): Promise<void> {
   const password = config.bootstrapPassword;
 
   if (!email || !password) {
+    return;
+  }
+
+  if (findAccountByEmail(email)) {
     return;
   }
 
