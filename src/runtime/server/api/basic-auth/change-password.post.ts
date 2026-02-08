@@ -14,7 +14,8 @@ import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
 
 const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(8).max(512),
+    // Existing accounts may have legacy short passwords; only new password is length-enforced.
+    currentPassword: z.string().min(1).max(512),
     newPassword: z.string().min(8).max(512),
     confirmNewPassword: z.string().min(8).max(512)
   })

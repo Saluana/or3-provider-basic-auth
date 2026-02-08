@@ -24,11 +24,22 @@ declare module '~/composables/auth/useSessionContext' {
   };
 }
 
-declare module '~/core/auth-ui/registry' {
+declare module '#app' {
   import type { Component } from 'vue';
 
-  export function registerAuthUiAdapter(input: {
-    id: string;
-    component: Component;
-  }): void;
+  interface NuxtApp {
+    $registerAuthUiAdapter?: (input: {
+      id: string;
+      component: Component;
+    }) => void;
+  }
+}
+
+declare module 'vue' {
+  interface ComponentCustomProperties {
+    $registerAuthUiAdapter?: (input: {
+      id: string;
+      component: Component;
+    }) => void;
+  }
 }

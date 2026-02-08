@@ -1,5 +1,5 @@
 <template>
-  <div v-if="isBasicAuthProvider" class="w-full">
+  <template v-if="isBasicAuthProvider">
     <BasicAuthUserMenu
       v-if="isSignedIn"
       :email="sessionUser?.email"
@@ -8,8 +8,21 @@
       @change-password="changePasswordModalOpen = true"
     />
 
-    <UButton v-else block type="button" @click="signInModalOpen = true">
-      Login
+    <UButton
+      v-else
+      v-bind="loginButtonProps"
+      type="button"
+      aria-label="Login"
+      @click="signInModalOpen = true"
+    >
+      <template #default>
+        <span class="flex flex-col items-center gap-1 w-full">
+          <UIcon name="i-lucide-log-in" class="h-[18px] w-[18px]" />
+          <span class="text-[7px] uppercase tracking-wider whitespace-nowrap">
+            Login
+          </span>
+        </span>
+      </template>
     </UButton>
 
     <BasicAuthSignInModal
@@ -21,7 +34,7 @@
       v-model="changePasswordModalOpen"
       @updated="onPasswordUpdated"
     />
-  </div>
+  </template>
 </template>
 
 <script setup lang="ts">
@@ -65,16 +78,17 @@ async function tryRefreshTokens(): Promise<boolean> {
 
   refreshRequest = (async () => {
     try {
-      await $fetch('/api/basic-auth/refresh', {
-        method: 'POST'
+      const response = await $fetch<{ ok?: boolean }>('/api/basic-auth/refresh', {
+        method: 'POST',
+        ignoreResponseError: true
       });
-      return true;
+      return response?.ok === true;
     } catch {
       return false;
-    } finally {
-      refreshRequest = null;
     }
-  })();
+  })().finally(() => {
+    refreshRequest = null;
+  });
 
   return refreshRequest;
 }
@@ -117,17 +131,35 @@ const isSignedIn = computed(
   () => session.value?.authenticated === true && session.value.provider === BASIC_AUTH_PROVIDER_ID
 );
 const sessionUser = computed(() => session.value?.user);
+const loginButtonProps = {
+  block: true,
+  variant: 'ghost' as const,
+  color: 'neutral' as const,
+  class:
+    'theme-btn h-[48px] w-[48px] p-0! flex flex-col items-center justify-center gap-1 py-1.5 bg-transparent border-[length:var(--md-border-width)] border-[color:var(--md-primary)]/30 rounded-[var(--md-border-radius)] text-[var(--md-primary)] hover:bg-[var(--md-primary)]/15 active:bg-[var(--md-primary)]/25 transition-colors duration-150 shadow-none',
+  ui: {
+    base: 'justify-center shadow-none'
+  }
+};
+
+function notifyAuthSessionChanged(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('or3:auth-session-changed'));
+}
 
 async function onSignedIn(): Promise<void> {
   await refreshSession({ allowSilentRefresh: false });
+  notifyAuthSessionChanged();
 }
 
 async function onSignedOut(): Promise<void> {
   await refreshSession({ allowSilentRefresh: false });
+  notifyAuthSessionChanged();
 }
 
 async function onPasswordUpdated(): Promise<void> {
   await refreshSession({ allowSilentRefresh: false });
+  notifyAuthSessionChanged();
 }
 
 onMounted(() => {

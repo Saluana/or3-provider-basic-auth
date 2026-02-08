@@ -5,13 +5,16 @@ import BasicAuthChangePasswordModal from '../BasicAuthChangePasswordModal.client
 
 const UModalStub = defineComponent({
   props: {
-    open: { type: Boolean, default: false }
+    open: { type: Boolean, default: false },
+    title: { type: String, default: '' },
+    description: { type: String, default: '' }
   },
-  template: '<div v-if="open"><slot name="content" /></div>'
+  template: '<div v-if="open"><slot name="body" /></div>'
 });
 
-const UCardStub = defineComponent({
-  template: '<div><slot name="header" /><slot /></div>'
+const UFormFieldStub = defineComponent({
+  props: { label: String, name: String },
+  template: '<div><slot /></div>'
 });
 
 const UFormStub = defineComponent({
@@ -47,10 +50,12 @@ describe('BasicAuthChangePasswordModal', () => {
       global: {
         components: {
           UModal: UModalStub,
-          UCard: UCardStub,
+          UFormField: UFormFieldStub,
           UForm: UFormStub,
           UInput: UInputStub,
-          UButton: UButtonStub
+          UButton: UButtonStub,
+          USeparator: defineComponent({ template: '<hr />' }),
+          UIcon: defineComponent({ template: '<span />' })
         }
       }
     });
@@ -93,10 +98,12 @@ describe('BasicAuthChangePasswordModal', () => {
       global: {
         components: {
           UModal: UModalStub,
-          UCard: UCardStub,
+          UFormField: UFormFieldStub,
           UForm: UFormStub,
           UInput: UInputStub,
-          UButton: UButtonStub
+          UButton: UButtonStub,
+          USeparator: defineComponent({ template: '<hr />' }),
+          UIcon: defineComponent({ template: '<span />' })
         }
       }
     });

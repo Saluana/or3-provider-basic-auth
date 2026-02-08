@@ -1,22 +1,45 @@
 import type { Component } from 'vue';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 
-type AuthUiRegistryModule = {
-  registerAuthUiAdapter?: (input: { id: string; component: Component }) => void;
+type AuthUiRegistryInput = {
+  id: string;
+  component: Component;
+};
+type AuthUiRegistryBridge = {
+  $registerAuthUiAdapter?: (input: AuthUiRegistryInput) => void;
+};
+type AuthUiRegistryGlobalState = typeof globalThis & {
+  __or3AuthUiAdapterQueue__?: AuthUiRegistryInput[];
 };
 
-async function tryRegisterAuthUiAdapter(component: Component): Promise<void> {
-  try {
-    const mod = (await import('~/core/auth-ui/registry')) as AuthUiRegistryModule;
-    if (typeof mod.registerAuthUiAdapter === 'function') {
-      mod.registerAuthUiAdapter({
-        id: BASIC_AUTH_PROVIDER_ID,
-        component
-      });
-    }
-  } catch {
-    // Auth UI registry is introduced in the provider-decoupling phase.
-    // Ignore in older host versions where this module does not exist.
+function tryRegisterAuthUiAdapter(component: Component): boolean {
+  const nuxtApp = useNuxtApp() as AuthUiRegistryBridge;
+  if (typeof nuxtApp.$registerAuthUiAdapter !== 'function') {
+    return false;
+  }
+  nuxtApp.$registerAuthUiAdapter({
+    id: BASIC_AUTH_PROVIDER_ID,
+    component
+  });
+  return true;
+}
+
+function enqueueAuthUiAdapter(component: Component): void {
+  const payload: AuthUiRegistryInput = {
+    id: BASIC_AUTH_PROVIDER_ID,
+    component
+  };
+  const globalState = globalThis as AuthUiRegistryGlobalState;
+  if (!Array.isArray(globalState.__or3AuthUiAdapterQueue__)) {
+    globalState.__or3AuthUiAdapterQueue__ = [];
+  }
+  globalState.__or3AuthUiAdapterQueue__.push(payload);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<AuthUiRegistryInput>('or3:auth-ui-adapter-register', {
+        detail: payload
+      })
+    );
   }
 }
 
@@ -31,11 +54,12 @@ export default defineNuxtPlugin(async () => {
     return;
   }
 
-  const componentModulePath = '../components/SidebarAuthButtonBasic.client.vue';
-  const componentModule = (await import(componentModulePath)) as {
+  const componentModule = (await import('../components/SidebarAuthButtonBasic.client.vue')) as {
     default?: Component;
   };
   if (componentModule.default) {
-    await tryRegisterAuthUiAdapter(componentModule.default);
+    if (!tryRegisterAuthUiAdapter(componentModule.default)) {
+      enqueueAuthUiAdapter(componentModule.default);
+    }
   }
 });

@@ -3,6 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount } from '@vue/test-utils';
 import BasicAuthUserMenu from '../BasicAuthUserMenu.client.vue';
 
+const UPopoverStub = defineComponent({
+  template: '<div><slot /><slot name="content" /></div>'
+});
+
 const UButtonStub = defineComponent({
   emits: ['click'],
   props: {
@@ -24,7 +28,9 @@ describe('BasicAuthUserMenu', () => {
       },
       global: {
         components: {
-          UButton: UButtonStub
+          UButton: UButtonStub,
+          UPopover: UPopoverStub,
+          UIcon: true
         }
       }
     });

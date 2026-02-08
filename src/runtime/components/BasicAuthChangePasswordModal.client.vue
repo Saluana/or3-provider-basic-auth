@@ -1,50 +1,82 @@
 <template>
-  <UModal v-model:open="isOpen">
-    <template #content>
-      <UCard>
-        <template #header>
-          <h3 class="text-base font-semibold">Change Password</h3>
-        </template>
-
-        <UForm :state="state" @submit.prevent="onSubmit">
-          <div class="space-y-3">
+  <UModal
+    v-model:open="isOpen"
+    title="Change Password"
+    description="Update your account password"
+    :ui="modalUi"
+  >
+    <template #body>
+      <UForm :state="state" @submit.prevent="onSubmit">
+        <div class="flex flex-col gap-4">
+          <UFormField label="Current Password" name="currentPassword">
             <UInput
               v-model="state.currentPassword"
               type="password"
-              placeholder="Current password"
+              placeholder="••••••••"
               autocomplete="current-password"
               required
+              class="w-full"
             />
+          </UFormField>
+
+          <USeparator />
+
+          <UFormField label="New Password" name="newPassword">
             <UInput
               v-model="state.newPassword"
               type="password"
-              placeholder="New password"
+              placeholder="••••••••"
               autocomplete="new-password"
               required
+              class="w-full"
             />
+          </UFormField>
+
+          <UFormField label="Confirm New Password" name="confirmNewPassword">
             <UInput
               v-model="state.confirmNewPassword"
               type="password"
-              placeholder="Confirm new password"
+              placeholder="••••••••"
               autocomplete="new-password"
               required
+              class="w-full"
             />
-            <p v-if="errorMessage" class="text-sm text-red-600">{{ errorMessage }}</p>
-            <div class="flex justify-end gap-2">
-              <UButton color="neutral" variant="soft" type="button" :disabled="pending" @click="close">
-                Cancel
-              </UButton>
-              <UButton type="submit" :loading="pending">Update Password</UButton>
-            </div>
+          </UFormField>
+
+          <div
+            v-if="errorMessage"
+            class="flex items-start gap-2 rounded-[var(--md-border-radius)] border border-[var(--md-error)]/30 bg-[var(--md-error)]/8 px-3 py-2.5 text-sm text-[var(--md-error)]"
+          >
+            <UIcon name="i-lucide-alert-circle" class="w-4 h-4 mt-0.5 shrink-0" />
+            {{ errorMessage }}
           </div>
-        </UForm>
-      </UCard>
+
+          <div class="flex justify-end gap-2 pt-1">
+            <UButton
+              color="neutral"
+              variant="outline"
+              type="button"
+              :disabled="pending"
+              @click="close"
+            >
+              Cancel
+            </UButton>
+            <UButton type="submit" :loading="pending">
+              Update Password
+            </UButton>
+          </div>
+        </div>
+      </UForm>
     </template>
   </UModal>
 </template>
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
+
+const modalUi = {
+  content: 'sm:max-w-[400px]',
+};
 
 const props = defineProps<{
   modelValue: boolean;

@@ -23,7 +23,11 @@ describe('SidebarAuthButtonBasic', () => {
         return { session: null };
       }
 
-      throw new Error('session expired');
+      if (url === '/api/basic-auth/refresh') {
+        return { ok: false };
+      }
+
+      throw new Error(`Unexpected URL: ${url}`);
     });
     vi.stubGlobal('$fetch', fetchMock);
 
@@ -41,7 +45,10 @@ describe('SidebarAuthButtonBasic', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Login');
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', { method: 'POST' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', {
+      method: 'POST',
+      ignoreResponseError: true
+    });
   });
 
   it('renders signed-in menu when authenticated with basic-auth provider', async () => {
@@ -75,7 +82,10 @@ describe('SidebarAuthButtonBasic', () => {
 
     expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
     expect(wrapper.text()).not.toContain('Login');
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/basic-auth/refresh', { method: 'POST' });
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/basic-auth/refresh', {
+      method: 'POST',
+      ignoreResponseError: true
+    });
   });
 
   it('silently refreshes tokens when session endpoint returns null', async () => {
@@ -122,7 +132,10 @@ describe('SidebarAuthButtonBasic', () => {
     await flushPromises();
     await wrapper.vm.$nextTick();
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', { method: 'POST' });
+    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh', {
+      method: 'POST',
+      ignoreResponseError: true
+    });
     expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
   });
 });

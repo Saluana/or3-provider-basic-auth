@@ -21,7 +21,8 @@ import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
 
 const signInSchema = z.object({
   email: z.string().email().max(320),
-  password: z.string().min(8).max(512)
+  // Sign-in must allow legacy short passwords; strength is enforced at set/change time.
+  password: z.string().min(1).max(512)
 });
 
 const DUMMY_PASSWORD_HASH =
