@@ -37,5 +37,8 @@ export default defineNuxtModule({
     addPlugin(resolve('runtime/plugins/basic-auth-ui.client'), {
       append: true
     });
+    addPlugin(resolve('runtime/plugins/auth-status.client'), {
+      append: true
+    });
   }
 });
