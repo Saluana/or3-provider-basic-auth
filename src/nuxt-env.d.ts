@@ -1,26 +1,34 @@
 declare global {
   const defineNuxtPlugin: typeof import('nuxt/app')['defineNuxtPlugin'];
-  const defineNitroPlugin: (handler: (nitro: any) => void | Promise<void>) => void;
+  const defineNitroPlugin: (handler: (nitro: unknown) => void | Promise<void>) => void;
   const useRuntimeConfig: typeof import('nuxt/app')['useRuntimeConfig'];
 
   interface ImportMeta {
     readonly hot?: {
-      readonly data: Record<string, any>;
+      readonly data: Record<string, unknown>;
       accept(): void;
-      dispose(cb: (data: Record<string, any>) => void): void;
+      dispose(cb: (data: Record<string, unknown>) => void): void;
     };
   }
 }
 
 declare module '*.vue' {
   import type { DefineComponent } from 'vue';
-  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, any>;
+  const component: DefineComponent<
+    Record<string, unknown>,
+    Record<string, unknown>,
+    Record<string, unknown>
+  >;
   export default component;
 }
 
 declare module '*.client.vue' {
   import type { DefineComponent } from 'vue';
-  const component: DefineComponent<Record<string, unknown>, Record<string, unknown>, any>;
+  const component: DefineComponent<
+    Record<string, unknown>,
+    Record<string, unknown>,
+    Record<string, unknown>
+  >;
   export default component;
 }
 

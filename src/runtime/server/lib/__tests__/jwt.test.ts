@@ -115,7 +115,7 @@ describe('jwt helpers', () => {
           }
         }
       }
-    } as any;
+    } as unknown as Parameters<typeof getAccessTokenFromEvent>[0];
 
     expect(getAccessTokenFromEvent(event)).toBe('token-123');
   });

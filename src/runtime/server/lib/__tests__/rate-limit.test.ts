@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { H3Event } from 'h3';
 import {
   enforceBasicAuthRateLimit,
   getBasicAuthRateLimitStoreSizeForTests,
   resetBasicAuthRateLimitStore
 } from '../rate-limit';
 
-function createEvent(input: { remoteAddress: string; headers?: Record<string, string> }) {
+function createEvent(input: { remoteAddress: string; headers?: Record<string, string> }): H3Event {
   const responseHeaders = new Map<string, string>();
 
   return {
@@ -24,7 +25,7 @@ function createEvent(input: { remoteAddress: string; headers?: Record<string, st
       }
     },
     context: {}
-  } as any;
+  } as unknown as H3Event;
 }
 
 describe('basic-auth rate limit', () => {
@@ -100,8 +101,12 @@ describe('basic-auth rate limit', () => {
         'basic-auth:sign-in'
       );
       throw new Error('Expected rate limit error');
-    } catch (error: any) {
-      expect(error.statusCode).toBe(429);
+    } catch (error: unknown) {
+      const h3Error = error as { statusCode?: number };
+      expect(h3Error.statusCode).toBe(429);
+      return;
     }
+
+    expect(false).toBe(true);
   });
 });

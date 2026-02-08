@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import type { H3Event } from 'h3';
 import { hashPassword } from '../../lib/password';
 import { createAccount, createAuthSession } from '../../lib/session-store';
 import { signAccessToken, hashRefreshToken } from '../../lib/jwt';
@@ -56,7 +57,7 @@ describe('basicAuthProvider.getSession', () => {
         }
       },
       context: {}
-    } as any;
+    } as unknown as H3Event;
 
     const session = await basicAuthProvider.getSession(event);
 
