@@ -19,6 +19,11 @@ export default defineNuxtModule({
       handler: resolve('runtime/server/api/basic-auth/sign-in.post')
     });
     addServerHandler({
+      route: '/api/basic-auth/register',
+      method: 'post',
+      handler: resolve('runtime/server/api/basic-auth/register.post')
+    });
+    addServerHandler({
       route: '/api/basic-auth/sign-out',
       method: 'post',
       handler: resolve('runtime/server/api/basic-auth/sign-out.post')

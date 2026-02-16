@@ -1,1 +1,7 @@
-export { useRuntimeConfig, useNuxtApp, useFetch, useState } from 'nuxt/app';
+export {
+	defineNuxtPlugin,
+	useRuntimeConfig,
+	useNuxtApp,
+	useFetch,
+	useState
+} from 'nuxt/app';

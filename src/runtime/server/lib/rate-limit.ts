@@ -4,7 +4,12 @@ import {
   normalizeProxyTrustConfig
 } from './request-identity';
 
-type Operation = 'basic-auth:sign-in' | 'basic-auth:refresh' | 'basic-auth:sign-out' | 'basic-auth:change-password';
+type Operation =
+  | 'basic-auth:sign-in'
+  | 'basic-auth:register'
+  | 'basic-auth:refresh'
+  | 'basic-auth:sign-out'
+  | 'basic-auth:change-password';
 
 interface RateLimitRule {
   windowMs: number;
@@ -17,6 +22,7 @@ interface Entry {
 
 const RULES: Record<Operation, RateLimitRule> = {
   'basic-auth:sign-in': { windowMs: 60_000, maxRequests: 20 },
+  'basic-auth:register': { windowMs: 60_000, maxRequests: 10 },
   'basic-auth:refresh': { windowMs: 60_000, maxRequests: 120 },
   'basic-auth:sign-out': { windowMs: 60_000, maxRequests: 60 },
   'basic-auth:change-password': { windowMs: 60_000, maxRequests: 20 }

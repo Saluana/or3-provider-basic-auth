@@ -5,8 +5,14 @@
     "paths": {
       "h3": ["./node_modules/h3"],
       "#imports": ["./src/shims/imports.ts"],
+      "~/composables/auth/useClientAuthStatus.client": ["../or3-chat/app/composables/auth/useClientAuthStatus.client.ts"],
       "~~/server/auth/registry": ["./src/shims/server-auth-registry.d.ts"],
-      "~~/server/auth/token-broker/registry": ["./src/shims/server-auth-token-broker-registry.d.ts"]
+      "~~/server/auth/token-broker/registry": ["./src/shims/server-auth-token-broker-registry.d.ts"],
+      "~~/server/auth/store/registry": ["./src/shims/server-auth-store-registry.d.ts"],
+      "~~/server/auth/store/types": ["./src/shims/server-auth-store-types.d.ts"],
+      "~~/server/auth/registration": ["./src/shims/server-auth-registration.d.ts"],
+      "~~/server/admin/providers/types": ["./src/shims/server-admin-providers-types.d.ts"],
+      "~~/server/admin/providers/registry": ["./src/shims/server-admin-providers-registry.d.ts"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],

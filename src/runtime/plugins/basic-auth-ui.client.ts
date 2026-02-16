@@ -1,9 +1,9 @@
-import type { Component } from 'vue';
+import { defineNuxtPlugin, useNuxtApp, useRuntimeConfig } from '#imports';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 
 type AuthUiRegistryInput = {
   id: string;
-  component: Component;
+  component: unknown;
 };
 type AuthUiRegistryBridge = {
   $registerAuthUiAdapter?: (input: AuthUiRegistryInput) => void;
@@ -12,7 +12,7 @@ type AuthUiRegistryGlobalState = typeof globalThis & {
   __or3AuthUiAdapterQueue__?: AuthUiRegistryInput[];
 };
 
-function tryRegisterAuthUiAdapter(component: Component): boolean {
+function tryRegisterAuthUiAdapter(component: unknown): boolean {
   const nuxtApp = useNuxtApp() as AuthUiRegistryBridge;
   if (typeof nuxtApp.$registerAuthUiAdapter !== 'function') {
     return false;
@@ -24,7 +24,7 @@ function tryRegisterAuthUiAdapter(component: Component): boolean {
   return true;
 }
 
-function enqueueAuthUiAdapter(component: Component): void {
+function enqueueAuthUiAdapter(component: unknown): void {
   const payload: AuthUiRegistryInput = {
     id: BASIC_AUTH_PROVIDER_ID,
     component
@@ -55,7 +55,7 @@ export default defineNuxtPlugin(async () => {
   }
 
   const componentModule = (await import('../components/SidebarAuthButtonBasic.client.vue')) as {
-    default?: Component;
+    default?: unknown;
   };
   if (componentModule.default) {
     if (!tryRegisterAuthUiAdapter(componentModule.default)) {

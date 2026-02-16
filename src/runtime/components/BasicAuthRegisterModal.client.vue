@@ -1,12 +1,12 @@
 <template>
   <UModal
     v-model:open="isOpen"
-    title="Sign In"
-        :close="{
+    title="Create Account"
+    description="Register a new account"
+    :close="{
       class: 'theme-btn',
       size: 'sm'
     }"
-    description="Enter your credentials to continue"
     :ui="modalUi"
   >
     <template #body>
@@ -23,13 +23,43 @@
             />
           </UFormField>
 
+          <UFormField label="Display name" name="displayName">
+            <UInput
+              v-model="state.displayName"
+              type="text"
+              placeholder="Your name"
+              autocomplete="name"
+              class="w-full"
+            />
+          </UFormField>
+
           <UFormField label="Password" name="password">
             <UInput
               v-model="state.password"
               type="password"
               placeholder="••••••••"
-              autocomplete="current-password"
+              autocomplete="new-password"
               required
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField label="Confirm password" name="confirmPassword">
+            <UInput
+              v-model="state.confirmPassword"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="new-password"
+              required
+              class="w-full"
+            />
+          </UFormField>
+
+          <UFormField label="Invite token (optional)" name="inviteToken">
+            <UInput
+              v-model="state.inviteToken"
+              type="text"
+              placeholder="paste invite token"
               class="w-full"
             />
           </UFormField>
@@ -44,16 +74,6 @@
 
           <div class="flex justify-end gap-2 pt-1">
             <UButton
-              class="theme-btn create-act-si-btn"
-              color="neutral"
-              variant="ghost"
-              type="button"
-              :disabled="pending"
-              @click="emit('open-register')"
-            >
-              Create account
-            </UButton>
-            <UButton
               color="neutral"
               variant="outline"
               type="button"
@@ -62,8 +82,8 @@
             >
               Cancel
             </UButton>
-            <UButton type="submit" :loading="pending">
-              Sign In
+            <UButton class="theme-btn new-act-btn" type="submit" :loading="pending">
+              Create account
             </UButton>
           </div>
         </div>
@@ -76,7 +96,7 @@
 import { computed, reactive, ref } from 'vue';
 
 const modalUi = {
-  content: 'sm:max-w-[380px]',
+  content: 'sm:max-w-[420px]',
 };
 
 const props = defineProps<{
@@ -85,13 +105,15 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void;
-  (event: 'signed-in'): void;
-  (event: 'open-register'): void;
+  (event: 'registered'): void;
 }>();
 
 const state = reactive({
   email: '',
-  password: ''
+  displayName: '',
+  password: '',
+  confirmPassword: '',
+  inviteToken: ''
 });
 const pending = ref(false);
 const errorMessage = ref('');
@@ -113,15 +135,18 @@ async function onSubmit(): Promise<void> {
   errorMessage.value = '';
 
   try {
-    await $fetch('/api/basic-auth/sign-in', {
+    await $fetch('/api/basic-auth/register', {
       method: 'POST',
       body: {
         email: state.email,
-        password: state.password
+        displayName: state.displayName || undefined,
+        password: state.password,
+        confirmPassword: state.confirmPassword,
+        inviteToken: state.inviteToken || undefined,
       }
     });
 
-    emit('signed-in');
+    emit('registered');
     close();
   } catch (error) {
     const statusCode =
@@ -129,11 +154,13 @@ async function onSubmit(): Promise<void> {
         ? Number((error as { statusCode?: number }).statusCode)
         : null;
     if (statusCode === 400) {
-      errorMessage.value = 'Please enter a valid email and password.';
-    } else if (statusCode === 401) {
-      errorMessage.value = 'Invalid credentials';
+      errorMessage.value = 'Please check your input and try again.';
+    } else if (statusCode === 403) {
+      errorMessage.value = 'Registration is restricted for this instance.';
+    } else if (statusCode === 409) {
+      errorMessage.value = 'Email is already in use.';
     } else {
-      errorMessage.value = 'Unable to sign in right now. Please try again.';
+      errorMessage.value = 'Unable to register right now. Please try again.';
     }
   } finally {
     pending.value = false;

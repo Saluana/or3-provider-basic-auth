@@ -28,6 +28,12 @@
     <BasicAuthSignInModal
       v-model="signInModalOpen"
       @signed-in="onSignedIn"
+      @open-register="openRegisterFromSignIn"
+    />
+
+    <BasicAuthRegisterModal
+      v-model="registerModalOpen"
+      @registered="onRegistered"
     />
 
     <BasicAuthChangePasswordModal
@@ -38,14 +44,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
+import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthUserMenu from './BasicAuthUserMenu.client.vue';
 import BasicAuthChangePasswordModal from './BasicAuthChangePasswordModal.client.vue';
 
 const runtimeConfig = useRuntimeConfig();
 const signInModalOpen = ref(false);
+const registerModalOpen = ref(false);
 const changePasswordModalOpen = ref(false);
 let refreshRequest: Promise<boolean> | null = null;
 
@@ -157,6 +165,19 @@ async function onSignedOut(): Promise<void> {
 }
 
 async function onPasswordUpdated(): Promise<void> {
+  await refreshSession({ allowSilentRefresh: false });
+  notifyAuthSessionChanged();
+}
+
+async function openRegisterFromSignIn(): Promise<void> {
+  signInModalOpen.value = false;
+  await nextTick();
+  setTimeout(() => {
+    registerModalOpen.value = true;
+  }, 0);
+}
+
+async function onRegistered(): Promise<void> {
   await refreshSession({ allowSilentRefresh: false });
   notifyAuthSessionChanged();
 }

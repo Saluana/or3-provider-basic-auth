@@ -1,11 +1,13 @@
 import { BASIC_AUTH_PROVIDER_ID } from '../../lib/constants';
 import { registerAuthProvider } from '~~/server/auth/registry';
+import { registerProviderAdminAdapter } from '~~/server/admin/providers/registry';
 import { registerProviderTokenBroker } from '~~/server/auth/token-broker/registry';
 import { basicAuthProvider } from '../auth/basic-auth-provider';
 import { createBasicAuthTokenBroker } from '../token-broker/basic-auth-token-broker';
 import { getBasicAuthConfig, validateBasicAuthConfig } from '../lib/config';
 import { hashPassword } from '../lib/password';
 import { ensureBootstrapAccount, findAccountByEmail } from '../lib/session-store';
+import { basicAuthAdminAdapter } from '../admin/adapters/auth-basic-auth';
 
 async function ensureBootstrapUserIfConfigured(): Promise<void> {
   const config = getBasicAuthConfig();
@@ -62,4 +64,5 @@ export default defineNitroPlugin(async () => {
   });
 
   registerProviderTokenBroker(BASIC_AUTH_PROVIDER_ID, createBasicAuthTokenBroker);
+  registerProviderAdminAdapter(basicAuthAdminAdapter);
 });

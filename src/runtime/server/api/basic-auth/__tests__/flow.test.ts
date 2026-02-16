@@ -7,6 +7,7 @@ import { createAccount } from '../../../lib/session-store';
 import { resetBasicAuthDbForTests } from '../../../db/client';
 import { resetBasicAuthRateLimitStore } from '../../../lib/rate-limit';
 import { handleSignIn } from '../sign-in.post';
+import { handleRegister } from '../register.post';
 import { handleRefresh } from '../refresh.post';
 import { handleSignOut } from '../sign-out.post';
 import { handleChangePassword } from '../change-password.post';
@@ -18,7 +19,17 @@ function applyRuntimeConfigStub() {
   (globalThis as typeof globalThis & { useRuntimeConfig?: unknown }).useRuntimeConfig = () => ({
     auth: {
       enabled: true,
-      provider: 'basic-auth'
+      provider: 'basic-auth',
+      registrationMode: 'open',
+      invite: {
+        tokenSecret: 'invite-secret',
+        tokenTtlSeconds: 3600,
+      }
+    },
+    public: {
+      sync: {
+        provider: 'sqlite'
+      }
     },
     security: {
       proxy: {
@@ -83,6 +94,7 @@ describe('basic-auth endpoint flow', () => {
     });
 
     const app = createApp();
+    app.use('/api/basic-auth/register', eventHandler(handleRegister));
     app.use('/api/basic-auth/sign-in', eventHandler(handleSignIn));
     app.use('/api/basic-auth/refresh', eventHandler(handleRefresh));
     app.use('/api/basic-auth/sign-out', eventHandler(handleSignOut));
@@ -141,6 +153,37 @@ describe('basic-auth endpoint flow', () => {
     const payload = await sessionResponse.json();
     expect(payload.session?.provider).toBe('basic-auth');
     expect(payload.session?.user?.email).toBe('user@example.com');
+  });
+
+  it('register creates account and authenticates session', async () => {
+    const jar: CookieJar = new Map();
+
+    const register = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: baseUrl
+      },
+      body: JSON.stringify({
+        email: 'new-user@example.com',
+        password: 'password-1234',
+        confirmPassword: 'password-1234',
+        displayName: 'New User'
+      })
+    });
+
+    expect(register.status).toBe(200);
+    applySetCookies(jar, getSetCookies(register));
+
+    const sessionResponse = await fetch(`${baseUrl}/api/auth/session`, {
+      headers: {
+        cookie: toCookieHeader(jar)
+      }
+    });
+
+    const payload = await sessionResponse.json();
+    expect(payload.session?.provider).toBe('basic-auth');
+    expect(payload.session?.user?.email).toBe('new-user@example.com');
   });
 
   it('refresh rotates sessions and replay of old refresh token is rejected', async () => {
