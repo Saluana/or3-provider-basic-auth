@@ -61,9 +61,10 @@ describe('BasicAuthChangePasswordModal', () => {
     });
 
     const inputs = wrapper.findAll('input');
-    await inputs[0]?.setValue('old-password-123');
-    await inputs[1]?.setValue('new-password-123');
-    await inputs[2]?.setValue('new-password-123');
+    const passwordInputs = inputs.slice(-3);
+    await passwordInputs[0]?.setValue('old-password-123');
+    await passwordInputs[1]?.setValue('new-password-123');
+    await passwordInputs[2]?.setValue('new-password-123');
 
     await wrapper.find('form').trigger('submit');
     await Promise.resolve();
@@ -109,9 +110,10 @@ describe('BasicAuthChangePasswordModal', () => {
     });
 
     const inputs = wrapper.findAll('input');
-    await inputs[0]?.setValue('old-password-123');
-    await inputs[1]?.setValue('new-password-123');
-    await inputs[2]?.setValue('new-password-123');
+    const passwordInputs = inputs.slice(-3);
+    await passwordInputs[0]?.setValue('old-password-123');
+    await passwordInputs[1]?.setValue('new-password-123');
+    await passwordInputs[2]?.setValue('new-password-123');
 
     await wrapper.find('form').trigger('submit');
     await Promise.resolve();

@@ -8,6 +8,16 @@
     <template #body>
       <UForm :state="state" @submit.prevent="onSubmit">
         <div class="flex flex-col gap-4">
+          <input
+            :value="props.username ?? ''"
+            type="text"
+            autocomplete="username"
+            tabindex="-1"
+            aria-hidden="true"
+            class="sr-only pointer-events-none h-0 w-0 opacity-0"
+            readonly
+          />
+
           <UFormField label="Current Password" name="currentPassword">
             <UInput
               v-model="state.currentPassword"
@@ -80,6 +90,7 @@ const modalUi = {
 
 const props = defineProps<{
   modelValue: boolean;
+  username?: string;
 }>();
 
 const emit = defineEmits<{

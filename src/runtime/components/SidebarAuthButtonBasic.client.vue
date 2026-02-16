@@ -38,6 +38,7 @@
 
     <BasicAuthChangePasswordModal
       v-model="changePasswordModalOpen"
+      :username="sessionUser?.email"
       @updated="onPasswordUpdated"
     />
   </template>

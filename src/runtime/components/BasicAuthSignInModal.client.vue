@@ -12,12 +12,22 @@
     <template #body>
       <UForm :state="state" @submit.prevent="onSubmit">
         <div class="flex flex-col gap-4">
+          <input
+            :value="state.email"
+            type="text"
+            autocomplete="username"
+            tabindex="-1"
+            aria-hidden="true"
+            class="sr-only pointer-events-none h-0 w-0 opacity-0"
+            readonly
+          />
+
           <UFormField label="Email" name="email">
             <UInput
               v-model="state.email"
               type="email"
               placeholder="you@example.com"
-              autocomplete="email"
+              autocomplete="username"
               required
               class="w-full"
             />
