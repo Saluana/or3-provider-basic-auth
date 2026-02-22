@@ -5,6 +5,7 @@ import {
   getBasicAuthRateLimitStoreSizeForTests,
   resetBasicAuthRateLimitStore
 } from '../rate-limit';
+import { resetBasicAuthDbForTests } from '../../db/client';
 
 function createEvent(input: { remoteAddress: string; headers?: Record<string, string> }): H3Event {
   const responseHeaders = new Map<string, string>();
@@ -31,6 +32,9 @@ function createEvent(input: { remoteAddress: string; headers?: Record<string, st
 describe('basic-auth rate limit', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    process.env.OR3_BASIC_AUTH_DB_PATH = ':memory:';
+    delete process.env.OR3_BASIC_AUTH_RATE_LIMIT_BACKEND;
+    resetBasicAuthDbForTests();
     resetBasicAuthRateLimitStore();
   });
 

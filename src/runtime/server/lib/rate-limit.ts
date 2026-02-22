@@ -3,6 +3,7 @@ import {
   getClientIp as getProxyClientIp,
   normalizeProxyTrustConfig
 } from './request-identity';
+import { getBasicAuthDb } from '../db/client';
 
 type Operation =
   | 'basic-auth:sign-in'
@@ -20,6 +21,8 @@ interface Entry {
   timestamps: number[];
 }
 
+type RateLimitBackend = 'sqlite' | 'memory';
+
 const RULES: Record<Operation, RateLimitRule> = {
   'basic-auth:sign-in': { windowMs: 60_000, maxRequests: 20 },
   'basic-auth:register': { windowMs: 60_000, maxRequests: 10 },
@@ -32,6 +35,8 @@ const store = new Map<string, Entry>();
 const MAX_WINDOW_MS = Math.max(...Object.values(RULES).map((rule) => rule.windowMs));
 const SWEEP_INTERVAL_MS = 60_000;
 let lastSweepAt = 0;
+const RATE_LIMIT_BACKEND_ENV = 'OR3_BASIC_AUTH_RATE_LIMIT_BACKEND';
+const DEFAULT_RATE_LIMIT_BACKEND: RateLimitBackend = 'sqlite';
 
 function getClientIp(event: H3Event): string {
   const runtimeConfig = useRuntimeConfig(event);
@@ -41,6 +46,16 @@ function getClientIp(event: H3Event): string {
 
 function getKey(subject: string, operation: Operation): string {
   return `${subject}:${operation}`;
+}
+
+function getWindowKey(subject: string, operation: Operation, windowStartMs: number): string {
+  return `${subject}:${operation}:${windowStartMs}`;
+}
+
+function resolveRateLimitBackend(): RateLimitBackend {
+  const raw = (process.env[RATE_LIMIT_BACKEND_ENV] ?? '').trim().toLowerCase();
+  if (raw === 'memory') return 'memory';
+  return DEFAULT_RATE_LIMIT_BACKEND;
 }
 
 function pruneRateLimitStore(now: number): void {
@@ -62,8 +77,19 @@ function pruneRateLimitStore(now: number): void {
   lastSweepAt = now;
 }
 
-export function enforceBasicAuthRateLimit(event: H3Event, operation: Operation): void {
-  const now = Date.now();
+function pruneSqliteRateLimitStore(now: number): void {
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) {
+    return;
+  }
+
+  getBasicAuthDb()
+    .prepare('DELETE FROM basic_auth_rate_limits WHERE updated_at <= ?')
+    .run(now - MAX_WINDOW_MS);
+
+  lastSweepAt = now;
+}
+
+function enforceInMemoryRateLimit(event: H3Event, operation: Operation, now: number): void {
   pruneRateLimitStore(now);
 
   const subject = getClientIp(event);
@@ -100,11 +126,95 @@ export function enforceBasicAuthRateLimit(event: H3Event, operation: Operation):
   );
 }
 
+function enforceSqliteRateLimit(event: H3Event, operation: Operation, now: number): void {
+  pruneSqliteRateLimitStore(now);
+
+  const subject = getClientIp(event);
+  const rule = RULES[operation];
+  const windowStart = Math.floor(now / rule.windowMs) * rule.windowMs;
+  const windowKey = getWindowKey(subject, operation, windowStart);
+  const db = getBasicAuthDb();
+
+  const loadCount = db.prepare(
+    'SELECT request_count FROM basic_auth_rate_limits WHERE key = ?'
+  );
+  const insertCount = db.prepare(`
+    INSERT INTO basic_auth_rate_limits (key, subject, operation, window_started_at, request_count, updated_at)
+    VALUES (?, ?, ?, ?, 1, ?)
+  `);
+  const incrementCount = db.prepare(`
+    UPDATE basic_auth_rate_limits
+    SET request_count = request_count + 1, updated_at = ?
+    WHERE key = ?
+  `);
+
+  const evaluate = db.transaction(() => {
+    const existing = loadCount.get(windowKey) as { request_count: number } | undefined;
+    if (!existing) {
+      insertCount.run(windowKey, subject, operation, windowStart, now);
+      return { blocked: false, requestCount: 1 };
+    }
+
+    if (existing.request_count >= rule.maxRequests) {
+      return { blocked: true, requestCount: existing.request_count };
+    }
+
+    incrementCount.run(now, windowKey);
+    return { blocked: false, requestCount: existing.request_count + 1 };
+  });
+
+  const result = evaluate.immediate();
+  if (result.blocked) {
+    const retryAfterMs = Math.max(0, windowStart + rule.windowMs - now);
+    const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+    setResponseHeader(event, 'Retry-After', retryAfterSeconds);
+    setResponseHeader(event, 'X-RateLimit-Limit', String(rule.maxRequests));
+    setResponseHeader(event, 'X-RateLimit-Remaining', '0');
+    throw createError({
+      statusCode: 429,
+      statusMessage: 'Too many requests'
+    });
+  }
+
+  setResponseHeader(event, 'X-RateLimit-Limit', String(rule.maxRequests));
+  setResponseHeader(
+    event,
+    'X-RateLimit-Remaining',
+    String(Math.max(0, rule.maxRequests - result.requestCount))
+  );
+}
+
+export function enforceBasicAuthRateLimit(event: H3Event, operation: Operation): void {
+  const now = Date.now();
+  if (resolveRateLimitBackend() === 'memory') {
+    enforceInMemoryRateLimit(event, operation, now);
+    return;
+  }
+
+  enforceSqliteRateLimit(event, operation, now);
+}
+
 export function resetBasicAuthRateLimitStore(): void {
   store.clear();
   lastSweepAt = 0;
+  try {
+    getBasicAuthDb().prepare('DELETE FROM basic_auth_rate_limits').run();
+  } catch {
+    // Ignore DB initialization errors in test cleanup paths.
+  }
 }
 
 export function getBasicAuthRateLimitStoreSizeForTests(): number {
-  return store.size;
+  if (resolveRateLimitBackend() === 'memory') {
+    return store.size;
+  }
+
+  try {
+    const row = getBasicAuthDb()
+      .prepare('SELECT COUNT(*) as count FROM basic_auth_rate_limits')
+      .get() as { count: number } | undefined;
+    return row?.count ?? 0;
+  } catch {
+    return 0;
+  }
 }

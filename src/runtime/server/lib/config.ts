@@ -5,6 +5,8 @@ import {
   DEFAULT_REFRESH_TTL_SECONDS
 } from '../../lib/constants';
 
+export const BASIC_AUTH_INSECURE_DEV_ESCAPE_HATCH_ENV = 'OR3_BASIC_AUTH_ALLOW_INSECURE_DEV';
+
 export interface BasicAuthConfig {
   providerId: string;
   enabled: boolean;
@@ -37,13 +39,20 @@ function parsePositiveInt(input: string | undefined, fallback: number): number {
 function isStrictMode(runtimeConfig: ReturnType<typeof useRuntimeConfig>): boolean {
   if (process.env.OR3_STRICT_CONFIG === 'true') return true;
   if (process.env.NODE_ENV === 'production') return true;
-  return runtimeConfig.auth.strict === true;
+  return runtimeConfig.auth?.strict === true;
+}
+
+export function isBasicAuthInsecureDevEscapeHatchEnabled(): boolean {
+  return (
+    process.env.NODE_ENV !== 'production' &&
+    process.env[BASIC_AUTH_INSECURE_DEV_ESCAPE_HATCH_ENV] === 'true'
+  );
 }
 
 export function getBasicAuthConfig(runtimeConfig?: ReturnType<typeof useRuntimeConfig>): BasicAuthConfig {
   const config = runtimeConfig ?? useRuntimeConfig();
-  const enabled = config.auth.enabled === true;
-  const providerId = config.auth.provider || BASIC_AUTH_PROVIDER_ID;
+  const enabled = config.auth?.enabled === true;
+  const providerId = config.auth?.provider || BASIC_AUTH_PROVIDER_ID;
 
   const cwd = process.cwd();
   const configuredDbPath = process.env.OR3_BASIC_AUTH_DB_PATH;
@@ -54,7 +63,7 @@ export function getBasicAuthConfig(runtimeConfig?: ReturnType<typeof useRuntimeC
     : resolve(cwd, '.data/or3-basic-auth.sqlite');
 
   const jwtSecret = process.env.OR3_BASIC_AUTH_JWT_SECRET ?? '';
-  const refreshSecret = process.env.OR3_BASIC_AUTH_REFRESH_SECRET ?? jwtSecret;
+  const refreshSecret = process.env.OR3_BASIC_AUTH_REFRESH_SECRET ?? '';
 
   return {
     providerId,
@@ -93,6 +102,10 @@ export function validateBasicAuthConfig(runtimeConfig?: ReturnType<typeof useRun
     errors.push('Missing OR3_BASIC_AUTH_JWT_SECRET.');
   }
 
+  if (!config.refreshSecret) {
+    errors.push('Missing OR3_BASIC_AUTH_REFRESH_SECRET.');
+  }
+
   if (config.accessTtlSeconds > DEFAULT_ACCESS_TTL_SECONDS) {
     warnings.push(
       `OR3_BASIC_AUTH_ACCESS_TTL_SECONDS=${config.accessTtlSeconds} is above recommended ${DEFAULT_ACCESS_TTL_SECONDS}s.`
@@ -111,6 +124,12 @@ export function validateBasicAuthConfig(runtimeConfig?: ReturnType<typeof useRun
   ) {
     warnings.push(
       'Bootstrap account is partially configured. Set both OR3_BASIC_AUTH_BOOTSTRAP_EMAIL and OR3_BASIC_AUTH_BOOTSTRAP_PASSWORD.'
+    );
+  }
+
+  if ((process.env.OR3_BASIC_AUTH_RATE_LIMIT_BACKEND ?? '').trim().toLowerCase() === 'memory') {
+    warnings.push(
+      'OR3_BASIC_AUTH_RATE_LIMIT_BACKEND=memory uses per-process rate limiting and is unsafe for clustered deployments.'
     );
   }
 

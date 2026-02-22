@@ -4,7 +4,12 @@ import { registerProviderAdminAdapter } from '~~/server/admin/providers/registry
 import { registerProviderTokenBroker } from '~~/server/auth/token-broker/registry';
 import { basicAuthProvider } from '../auth/basic-auth-provider';
 import { createBasicAuthTokenBroker } from '../token-broker/basic-auth-token-broker';
-import { getBasicAuthConfig, validateBasicAuthConfig } from '../lib/config';
+import {
+  BASIC_AUTH_INSECURE_DEV_ESCAPE_HATCH_ENV,
+  getBasicAuthConfig,
+  isBasicAuthInsecureDevEscapeHatchEnabled,
+  validateBasicAuthConfig
+} from '../lib/config';
 import { hashPassword } from '../lib/password';
 import { ensureBootstrapAccount, findAccountByEmail } from '../lib/session-store';
 import { basicAuthAdminAdapter } from '../admin/adapters/auth-basic-auth';
@@ -48,12 +53,14 @@ export default defineNitroPlugin(async () => {
 
   if (!diagnostics.isValid) {
     const message = `${diagnostics.errors.join(' ')} Install/configure basic-auth provider env values and restart.`;
-    if (diagnostics.config.strict) {
-      throw new Error(message);
+    if (isBasicAuthInsecureDevEscapeHatchEnabled() && !diagnostics.config.strict) {
+      console.warn(
+        `[basic-auth] ${message} Startup continues because ${BASIC_AUTH_INSECURE_DEV_ESCAPE_HATCH_ENV}=true (development only).`
+      );
+      return;
     }
 
-    console.warn(`[basic-auth] ${message}`);
-    return;
+    throw new Error(message);
   }
 
   await ensureBootstrapUserIfConfigured();

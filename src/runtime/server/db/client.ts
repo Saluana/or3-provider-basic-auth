@@ -1,9 +1,23 @@
 import { dirname } from 'node:path';
-import { mkdirSync } from 'node:fs';
+import { chmodSync, mkdirSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import { getBasicAuthConfig } from '../lib/config';
 
 let dbSingleton: Database.Database | null = null;
+const DB_DIR_MODE = 0o700;
+const DB_FILE_MODE = 0o600;
+
+function hardenDbDirectoryPermissions(dbPath: string): void {
+  if (dbPath === ':memory:' || process.platform === 'win32') return;
+  const dir = dirname(dbPath);
+  mkdirSync(dir, { recursive: true, mode: DB_DIR_MODE });
+  chmodSync(dir, DB_DIR_MODE);
+}
+
+function hardenDbFilePermissions(dbPath: string): void {
+  if (dbPath === ':memory:' || process.platform === 'win32') return;
+  chmodSync(dbPath, DB_FILE_MODE);
+}
 
 function runMigrations(db: Database.Database): void {
   const versionRow = db.prepare('PRAGMA user_version').get() as
@@ -46,6 +60,23 @@ function runMigrations(db: Database.Database): void {
     `);
     db.pragma('user_version = 1');
   }
+
+  if (version < 2) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS basic_auth_rate_limits (
+        key TEXT PRIMARY KEY,
+        subject TEXT NOT NULL,
+        operation TEXT NOT NULL,
+        window_started_at INTEGER NOT NULL,
+        request_count INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_basic_auth_rate_limits_updated_at
+        ON basic_auth_rate_limits(updated_at);
+    `);
+    db.pragma('user_version = 2');
+  }
 }
 
 export function getBasicAuthDb(): Database.Database {
@@ -53,12 +84,34 @@ export function getBasicAuthDb(): Database.Database {
 
   const config = getBasicAuthConfig();
   if (config.dbPath !== ':memory:') {
-    mkdirSync(dirname(config.dbPath), { recursive: true });
+    try {
+      hardenDbDirectoryPermissions(config.dbPath);
+    } catch (error) {
+      throw new Error(
+        `[basic-auth] Failed to secure DB directory permissions for "${dirname(config.dbPath)}": ${
+          (error as Error).message
+        }`
+      );
+    }
   }
 
   const db = new Database(config.dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('foreign_keys = ON');
+
+  if (config.dbPath !== ':memory:') {
+    try {
+      hardenDbFilePermissions(config.dbPath);
+    } catch (error) {
+      db.close();
+      throw new Error(
+        `[basic-auth] Failed to secure DB file permissions for "${config.dbPath}": ${
+          (error as Error).message
+        }`
+      );
+    }
+  }
+
   runMigrations(db);
 
   dbSingleton = db;

@@ -38,6 +38,7 @@ describe('basic-auth register plugin', () => {
     process.env.OR3_BASIC_AUTH_DB_PATH = ':memory:';
     delete process.env.OR3_BASIC_AUTH_BOOTSTRAP_EMAIL;
     delete process.env.OR3_BASIC_AUTH_BOOTSTRAP_PASSWORD;
+    delete process.env.OR3_BASIC_AUTH_ALLOW_INSECURE_DEV;
 
     (globalThis as typeof globalThis & { defineNitroPlugin?: unknown }).defineNitroPlugin =
       (plugin: () => unknown) => plugin();
@@ -51,7 +52,8 @@ describe('basic-auth register plugin', () => {
   });
 
   it('registers auth provider and token broker', async () => {
-    await import('../register');
+    const mod = await import('../register');
+    await mod.default;
 
     expect(registerAuthProviderMock).toHaveBeenCalledTimes(1);
     expect(registerAuthProviderMock.mock.calls[0]?.[0]?.id).toBe('basic-auth');
@@ -61,10 +63,22 @@ describe('basic-auth register plugin', () => {
     );
   });
 
-  it('skips registration when required secret is missing in non-strict mode', async () => {
+  it('fails closed when required secret is missing', async () => {
     delete process.env.OR3_BASIC_AUTH_JWT_SECRET;
 
-    await import('../register');
+    const mod = await import('../register');
+    await expect(mod.default).rejects.toThrow('Missing OR3_BASIC_AUTH_JWT_SECRET.');
+
+    expect(registerAuthProviderMock).not.toHaveBeenCalled();
+    expect(registerProviderTokenBrokerMock).not.toHaveBeenCalled();
+  });
+
+  it('allows explicit insecure dev escape hatch when required secrets are missing', async () => {
+    delete process.env.OR3_BASIC_AUTH_JWT_SECRET;
+    process.env.OR3_BASIC_AUTH_ALLOW_INSECURE_DEV = 'true';
+
+    const mod = await import('../register');
+    await mod.default;
 
     expect(registerAuthProviderMock).not.toHaveBeenCalled();
     expect(registerProviderTokenBrokerMock).not.toHaveBeenCalled();
@@ -77,7 +91,8 @@ describe('basic-auth register plugin', () => {
       id: 'account-1'
     });
 
-    await import('../register');
+    const mod = await import('../register');
+    await mod.default;
 
     expect(hashPasswordMock).not.toHaveBeenCalled();
     expect(ensureBootstrapAccountMock).not.toHaveBeenCalled();
