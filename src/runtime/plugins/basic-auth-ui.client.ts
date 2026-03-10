@@ -7,9 +7,11 @@ type AuthUiRegistryInput = {
 };
 type AuthUiRegistryBridge = {
   $registerAuthUiAdapter?: (input: AuthUiRegistryInput) => void;
+  $registerLockPageAdapter?: (input: AuthUiRegistryInput) => void;
 };
 type AuthUiRegistryGlobalState = typeof globalThis & {
   __or3AuthUiAdapterQueue__?: AuthUiRegistryInput[];
+  __or3LockPageAdapterQueue__?: AuthUiRegistryInput[];
 };
 
 function tryRegisterAuthUiAdapter(component: unknown): boolean {
@@ -43,6 +45,37 @@ function enqueueAuthUiAdapter(component: unknown): void {
   }
 }
 
+function tryRegisterLockPageAdapter(component: unknown): boolean {
+  const nuxtApp = useNuxtApp() as AuthUiRegistryBridge;
+  if (typeof nuxtApp.$registerLockPageAdapter !== 'function') {
+    return false;
+  }
+  nuxtApp.$registerLockPageAdapter({
+    id: BASIC_AUTH_PROVIDER_ID,
+    component
+  });
+  return true;
+}
+
+function enqueueLockPageAdapter(component: unknown): void {
+  const payload: AuthUiRegistryInput = {
+    id: BASIC_AUTH_PROVIDER_ID,
+    component
+  };
+  const globalState = globalThis as AuthUiRegistryGlobalState;
+  if (!Array.isArray(globalState.__or3LockPageAdapterQueue__)) {
+    globalState.__or3LockPageAdapterQueue__ = [];
+  }
+  globalState.__or3LockPageAdapterQueue__.push(payload);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<AuthUiRegistryInput>('or3:lock-page-adapter-register', {
+        detail: payload
+      })
+    );
+  }
+}
+
 export default defineNuxtPlugin(async () => {
   if (import.meta.server) return;
 
@@ -60,6 +93,15 @@ export default defineNuxtPlugin(async () => {
   if (componentModule.default) {
     if (!tryRegisterAuthUiAdapter(componentModule.default)) {
       enqueueAuthUiAdapter(componentModule.default);
+    }
+  }
+
+  const lockPageModule = (await import('../components/BasicAuthLockPage.client.vue')) as {
+    default?: unknown;
+  };
+  if (lockPageModule.default) {
+    if (!tryRegisterLockPageAdapter(lockPageModule.default)) {
+      enqueueLockPageAdapter(lockPageModule.default);
     }
   }
 });
