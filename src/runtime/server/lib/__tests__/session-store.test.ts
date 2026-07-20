@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { hashPassword } from '../password';
 import {
   createAccount,
+  createAccountAndSession,
   createAuthSession,
+  findAccountByEmail,
   findSessionById,
   isSessionUsable,
   rotateSession,
@@ -56,6 +58,37 @@ describe('session store', () => {
     expect(result.ok).toBe(true);
     expect(findSessionById('sid-a')?.revoked_at).not.toBeNull();
     expect(isSessionUsable(findSessionById('sid-b'))).toBe(true);
+  });
+
+  it('rolls account creation back when session creation fails', async () => {
+    const existing = createAccount({
+      email: 'existing@example.com',
+      passwordHash: await hashPassword('pw-12345678')
+    });
+    createAuthSession({
+      accountId: existing.id,
+      sessionId: 'duplicate-session-id',
+      refreshTokenHash: hashRefreshToken('existing-refresh-token'),
+      expiresAtMs: Date.now() + 60_000
+    });
+
+    expect(() =>
+      createAccountAndSession({
+        account: {
+          id: 'new-account-id',
+          email: 'new@example.com',
+          passwordHash: 'new-password-hash'
+        },
+        session: {
+          accountId: 'new-account-id',
+          sessionId: 'duplicate-session-id',
+          refreshTokenHash: hashRefreshToken('new-refresh-token'),
+          expiresAtMs: Date.now() + 60_000
+        }
+      })
+    ).toThrow();
+
+    expect(findAccountByEmail('new@example.com')).toBeNull();
   });
 
   it('detects replay and revokes all account sessions', async () => {

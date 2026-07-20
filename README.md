@@ -56,6 +56,9 @@ Strict-mode behavior:
 
 - Credentials/session state is stored in a provider-owned SQLite DB.
 - Canonical OR3 users/workspaces are still resolved by the selected `AuthWorkspaceStore`.
+- In `invite_only` mode, signed-token, expiry, persisted invite state/token hash, and normalized-email validation runs before Basic Auth creates an account or session.
+- The selected `AuthWorkspaceStore` must support atomic invite provisioning; internal user/auth mapping, membership, and invite consumption are committed together by that provider.
+- Basic Auth account and initial refresh-session rows are created in one local SQLite transaction.
 - Access JWTs are short-lived and validated by `basicAuthProvider.getSession(event)`.
 - Refresh tokens are rotated and hashed at rest; replay attempts revoke active sessions.
 

@@ -22,6 +22,45 @@ declare module '~~/server/auth/store/types' {
     removeWorkspace(input: { userId: string; workspaceId: string }): Promise<void>;
     setActiveWorkspace(input: { userId: string; workspaceId: string }): Promise<void>;
 
+    validateInvite?(input: {
+      workspaceId: string;
+      email: string;
+      tokenHash: string;
+    }): Promise<
+      | { ok: true; role: WorkspaceRole }
+      | {
+          ok: false;
+          reason:
+            | 'not_found'
+            | 'expired'
+            | 'revoked'
+            | 'already_used'
+            | 'token_mismatch'
+            | 'email_mismatch';
+        }
+    >;
+
+    acceptInviteAndProvisionUser?(input: {
+      provider: string;
+      providerUserId: string;
+      email: string;
+      displayName?: string;
+      workspaceId: string;
+      tokenHash: string;
+    }): Promise<
+      | { ok: true; userId: string; role: WorkspaceRole; createdUser: boolean }
+      | {
+          ok: false;
+          reason:
+            | 'not_found'
+            | 'expired'
+            | 'revoked'
+            | 'already_used'
+            | 'token_mismatch'
+            | 'email_mismatch';
+        }
+    >;
+
     consumeInvite?(input: {
       workspaceId: string;
       email: string;
@@ -36,7 +75,8 @@ declare module '~~/server/auth/store/types' {
             | 'expired'
             | 'revoked'
             | 'already_used'
-            | 'token_mismatch';
+            | 'token_mismatch'
+            | 'email_mismatch';
         }
     >;
   }

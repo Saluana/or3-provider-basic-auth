@@ -1,9 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createHash, createHmac } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { createApp, eventHandler, toNodeListener } from 'h3';
+import { createApp, eventHandler, toNodeListener, type H3Event } from 'h3';
 import { hashPassword } from '../../../lib/password';
-import { createAccount } from '../../../lib/session-store';
+import { createAccount, findAccountByEmail } from '../../../lib/session-store';
 import { resetBasicAuthDbForTests } from '../../../db/client';
 import { resetBasicAuthRateLimitStore } from '../../../lib/rate-limit';
 import { handleSignIn } from '../sign-in.post';
@@ -12,15 +13,58 @@ import { handleRefresh } from '../refresh.post';
 import { handleSignOut } from '../sign-out.post';
 import { handleChangePassword } from '../change-password.post';
 import { basicAuthProvider } from '../../../auth/basic-auth-provider';
+import { validateInviteRegistration } from '~~/server/auth/registration';
+import {
+  verifyAuthorizationContract,
+  type AuthorizationCaseId,
+} from '../../../../../../../or3-chat/shared/testing/contracts/authorization';
 
 type CookieJar = Map<string, string>;
+
+let registrationMode: 'open' | 'invite_only' = 'open';
+const inviteStore = vi.hoisted(() => ({
+  validateInvite: vi.fn(),
+  acceptInviteAndProvisionUser: vi.fn()
+}));
+const coreRuntimeConfig = vi.hoisted(() => ({
+  auth: {
+    registrationMode: 'open' as 'open' | 'invite_only',
+    invite: { tokenSecret: 'invite-secret' }
+  }
+}));
+
+vi.mock('#imports', () => ({
+  useRuntimeConfig: () => coreRuntimeConfig
+}));
+
+vi.mock('~~/server/auth/store/registry', () => ({
+  getAuthWorkspaceStore: () => inviteStore
+}));
+
+function createInviteToken(
+  payload: { workspaceId: string; email: string; exp: number },
+  secret: string
+): string {
+  const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
+  const signature = createHmac('sha256', secret).update(encoded).digest('base64url');
+  return `${encoded}.${signature}`;
+}
+
+function hashInviteToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
+
+function setRegistrationMode(mode: 'open' | 'invite_only'): void {
+  registrationMode = mode;
+  coreRuntimeConfig.auth.registrationMode = mode;
+}
 
 function applyRuntimeConfigStub() {
   (globalThis as typeof globalThis & { useRuntimeConfig?: unknown }).useRuntimeConfig = () => ({
     auth: {
       enabled: true,
       provider: 'basic-auth',
-      registrationMode: 'open',
+      registrationMode,
       invite: {
         tokenSecret: 'invite-secret',
         tokenTtlSeconds: 3600,
@@ -75,6 +119,35 @@ describe('basic-auth endpoint flow', () => {
   let server: ReturnType<typeof createServer> | null = null;
   let baseUrl = '';
 
+  it('executes the shared invite signature and normalized-email contract', async () => {
+    const supported = new Set<AuthorizationCaseId>([
+      'invite-email-match', 'invite-email-mismatch',
+    ]);
+    inviteStore.validateInvite.mockResolvedValue({ ok: true });
+    const token = createInviteToken({
+      workspaceId: 'workspace-1',
+      email: 'Invited@Example.Test',
+      exp: Math.floor(Date.now() / 1000) + 60,
+    }, 'invite-secret');
+    const result = await verifyAuthorizationContract({
+      name: 'basic-auth-register',
+      supports: supported,
+      async evaluate(id) {
+        const decision = await validateInviteRegistration({
+          event: { context: {} } as H3Event,
+          store: inviteStore as any,
+          mode: 'invite_only',
+          email: id === 'invite-email-match'
+            ? 'invited@example.test'
+            : 'other@example.test',
+          inviteToken: token,
+        });
+        return decision.allowed ? 'allow' : 'deny';
+      },
+    });
+    expect(result.executed).toEqual(Array.from(supported));
+  });
+
   beforeEach(async () => {
     resetBasicAuthRateLimitStore();
     resetBasicAuthDbForTests();
@@ -85,6 +158,17 @@ describe('basic-auth endpoint flow', () => {
     process.env.OR3_BASIC_AUTH_ACCESS_TTL_SECONDS = '900';
     process.env.OR3_BASIC_AUTH_REFRESH_TTL_SECONDS = '3600';
 
+    setRegistrationMode('open');
+    inviteStore.validateInvite.mockReset().mockResolvedValue({
+      ok: true,
+      role: 'viewer'
+    });
+    inviteStore.acceptInviteAndProvisionUser.mockReset().mockResolvedValue({
+      ok: true,
+      userId: 'invited-user',
+      role: 'viewer',
+      createdUser: true
+    });
     applyRuntimeConfigStub();
 
     createAccount({
@@ -184,6 +268,159 @@ describe('basic-auth endpoint flow', () => {
     const payload = await sessionResponse.json();
     expect(payload.session?.provider).toBe('basic-auth');
     expect(payload.session?.user?.email).toBe('new-user@example.com');
+  });
+
+  it.each([
+    {
+      label: 'garbage',
+      email: 'garbage@example.com',
+      token: 'not-a-signed-invite'
+    },
+    {
+      label: 'expired',
+      email: 'expired@example.com',
+      token: createInviteToken(
+        {
+          workspaceId: 'ws-invite',
+          email: 'expired@example.com',
+          exp: Math.floor(Date.now() / 1000) - 60
+        },
+        'invite-secret'
+      )
+    }
+  ])('rejects a $label invite before creating an account or session', async ({ email, token }) => {
+    setRegistrationMode('invite_only');
+
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: baseUrl
+      },
+      body: JSON.stringify({
+        email,
+        password: 'password-1234',
+        confirmPassword: 'password-1234',
+        inviteToken: token
+      })
+    });
+
+    expect(response.status).toBe(403);
+    expect(findAccountByEmail(email)).toBeNull();
+    expect(inviteStore.validateInvite).not.toHaveBeenCalled();
+    expect(getSetCookies(response).join(';')).not.toContain('or3_access=');
+    expect(getSetCookies(response).join(';')).not.toContain('or3_refresh=');
+  });
+
+  it('rejects a consumed invite before creating an account or session', async () => {
+    setRegistrationMode('invite_only');
+    const email = 'consumed@example.com';
+    const token = createInviteToken(
+      {
+        workspaceId: 'ws-invite',
+        email,
+        exp: Math.floor(Date.now() / 1000) + 3600
+      },
+      'invite-secret'
+    );
+    inviteStore.validateInvite.mockResolvedValueOnce({
+      ok: false,
+      reason: 'already_used'
+    });
+
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: baseUrl
+      },
+      body: JSON.stringify({
+        email,
+        password: 'password-1234',
+        confirmPassword: 'password-1234',
+        inviteToken: token
+      })
+    });
+
+    expect(response.status).toBe(403);
+    expect(inviteStore.validateInvite).toHaveBeenCalledWith({
+      workspaceId: 'ws-invite',
+      email,
+      tokenHash: hashInviteToken(token)
+    });
+    expect(findAccountByEmail(email)).toBeNull();
+    expect(getSetCookies(response).join(';')).not.toContain('or3_access=');
+    expect(getSetCookies(response).join(';')).not.toContain('or3_refresh=');
+  });
+
+  it('rejects an invite for another normalized email before creating an account or session', async () => {
+    setRegistrationMode('invite_only');
+    const email = 'wrong-email@example.com';
+    const token = createInviteToken(
+      {
+        workspaceId: 'ws-invite',
+        email: 'intended@example.com',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      },
+      'invite-secret'
+    );
+
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: baseUrl
+      },
+      body: JSON.stringify({
+        email,
+        password: 'password-1234',
+        confirmPassword: 'password-1234',
+        inviteToken: token
+      })
+    });
+
+    expect(response.status).toBe(403);
+    expect(inviteStore.validateInvite).not.toHaveBeenCalled();
+    expect(findAccountByEmail(email)).toBeNull();
+    expect(getSetCookies(response).join(';')).not.toContain('or3_access=');
+    expect(getSetCookies(response).join(';')).not.toContain('or3_refresh=');
+  });
+
+  it('validates invite state before creating an invite-only account and session', async () => {
+    setRegistrationMode('invite_only');
+    const email = 'INVITED@example.com';
+    const token = createInviteToken(
+      {
+        workspaceId: 'ws-invite',
+        email: 'invited@example.com',
+        exp: Math.floor(Date.now() / 1000) + 3600
+      },
+      'invite-secret'
+    );
+
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: baseUrl
+      },
+      body: JSON.stringify({
+        email,
+        password: 'password-1234',
+        confirmPassword: 'password-1234',
+        inviteToken: token
+      })
+    });
+
+    expect(response.status).toBe(200);
+    expect(inviteStore.validateInvite).toHaveBeenCalledWith({
+      workspaceId: 'ws-invite',
+      email: 'invited@example.com',
+      tokenHash: hashInviteToken(token)
+    });
+    expect(findAccountByEmail('invited@example.com')).not.toBeNull();
+    expect(getSetCookies(response).join(';')).toContain('or3_access=');
+    expect(getSetCookies(response).join(';')).toContain('or3_refresh=');
   });
 
   it('refresh rotates sessions and replay of old refresh token is rejected', async () => {

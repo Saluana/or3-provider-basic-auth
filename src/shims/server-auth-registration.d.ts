@@ -38,4 +38,11 @@ declare module '~~/server/auth/registration' {
     mode: RegistrationMode;
     inviteToken?: string | null;
   }): RegistrationDecision;
+  export function validateInviteRegistration(input: {
+    event: H3Event;
+    store: AuthWorkspaceStore;
+    mode: RegistrationMode;
+    email: string;
+    inviteToken?: string | null;
+  }): Promise<RegistrationDecision>;
 }

@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { createError, defineEventHandler, setCookie, type H3Event } from 'h3';
 import { z } from 'zod';
+import { getAuthWorkspaceStore } from '~~/server/auth/store/registry';
+import {
+  resolveRegistrationMode,
+  validateInviteRegistration,
+  type RegistrationDecision
+} from '~~/server/auth/registration';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
 import {
@@ -11,8 +17,7 @@ import { signAccessToken, signRefreshToken, hashRefreshToken } from '../../lib/j
 import { hashPassword } from '../../lib/password';
 import { enforceBasicAuthRateLimit } from '../../lib/rate-limit';
 import {
-  createAccount,
-  createAuthSession,
+  createAccountAndSession,
   findAccountByEmail,
   normalizeEmail,
   getSessionMetadataFromEvent
@@ -32,11 +37,19 @@ const registerSchema = z
     message: 'Passwords must match'
   });
 
-function mapRegistrationErrorToHttp(reason: 'disabled' | 'invite_required'): never {
+function mapRegistrationErrorToHttp(
+  reason: Extract<RegistrationDecision, { allowed: false }>['reason']
+): never {
   if (reason === 'disabled') {
     throw createError({
       statusCode: 403,
       statusMessage: 'Registration is currently disabled. Please contact an administrator.'
+    });
+  }
+  if (reason === 'invite_secret_missing' || reason === 'invite_unsupported') {
+    throw createError({
+      statusCode: 503,
+      statusMessage: 'Invite-only registration is temporarily unavailable.'
     });
   }
   throw createError({
@@ -54,15 +67,8 @@ export async function handleRegister(event: H3Event) {
   const body = await parseBodyWithSchema(event, registerSchema);
   const email = normalizeEmail(body.email);
 
-  const existing = findAccountByEmail(email);
-  if (existing) {
-    throw createInvalidCredentialsError();
-  }
-
   const runtimeConfig = useRuntimeConfig();
-  const mode =
-    runtimeConfig.auth?.registrationMode ??
-    (runtimeConfig.auth?.autoProvision === false ? 'disabled' : 'open');
+  const mode = resolveRegistrationMode(runtimeConfig);
 
   if (mode === 'disabled') {
     mapRegistrationErrorToHttp('disabled');
@@ -72,39 +78,73 @@ export async function handleRegister(event: H3Event) {
     mapRegistrationErrorToHttp('invite_required');
   }
 
+  if (mode === 'invite_only') {
+    const syncConfig = runtimeConfig as {
+      sync?: { provider?: string };
+      public?: { sync?: { provider?: string } };
+    };
+    const storeId =
+      syncConfig.sync?.provider ??
+      syncConfig.public?.sync?.provider ??
+      'convex';
+    const store = getAuthWorkspaceStore(storeId);
+    if (!store) {
+      mapRegistrationErrorToHttp('invite_unsupported');
+    }
+    const decision = await validateInviteRegistration({
+      event,
+      store,
+      mode,
+      email,
+      inviteToken: body.inviteToken
+    });
+    if (!decision.allowed) {
+      mapRegistrationErrorToHttp(decision.reason);
+    }
+  }
+
+  const existing = findAccountByEmail(email);
+  if (existing) {
+    throw createInvalidCredentialsError();
+  }
+
   const passwordHash = await hashPassword(body.password);
-  const account = createAccount({
-    email,
-    passwordHash,
-    displayName: body.displayName?.trim() || null
-  });
 
   const config = getBasicAuthConfig();
   if (config.refreshTtlSeconds <= 0 || config.accessTtlSeconds <= 0) {
     throw createInvalidRequestError();
   }
 
+  const accountId = randomUUID();
   const sessionId = randomUUID();
   const refreshToken = await signRefreshToken({
-    sub: account.id,
+    sub: accountId,
     sid: sessionId,
-    ver: account.token_version
-  });
-
-  createAuthSession({
-    accountId: account.id,
-    sessionId,
-    refreshTokenHash: hashRefreshToken(refreshToken),
-    expiresAtMs: Date.now() + config.refreshTtlSeconds * 1000,
-    metadata: getSessionMetadataFromEvent(event)
+    ver: 0
   });
 
   const accessToken = await signAccessToken({
-    sub: account.id,
+    sub: accountId,
     sid: sessionId,
-    ver: account.token_version,
-    email: account.email,
-    display_name: account.display_name
+    ver: 0,
+    email,
+    display_name: body.displayName?.trim() || null
+  });
+
+  createAccountAndSession({
+    account: {
+      id: accountId,
+      email,
+      passwordHash,
+      displayName: body.displayName?.trim() || null
+    },
+    session: {
+      accountId,
+      sessionId,
+      refreshTokenHash: hashRefreshToken(refreshToken),
+      expiresAtMs: Date.now() + config.refreshTtlSeconds * 1000,
+      metadata: getSessionMetadataFromEvent(event)
+    }
   });
 
   setAccessCookie(event, accessToken, config.accessTtlSeconds);

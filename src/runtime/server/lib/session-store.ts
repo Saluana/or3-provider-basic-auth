@@ -8,6 +8,7 @@ import {
 } from './request-identity';
 
 export interface CreateAccountInput {
+  id?: string;
   email: string;
   passwordHash: string;
   displayName?: string | null;
@@ -91,7 +92,7 @@ export function createAccount(input: CreateAccountInput): BasicAuthAccount {
   const now = Date.now();
 
   const account: BasicAuthAccount = {
-    id: randomUUID(),
+    id: input.id ?? randomUUID(),
     email: normalizeEmail(input.email),
     password_hash: input.passwordHash,
     display_name: input.displayName ?? null,
@@ -115,6 +116,21 @@ export function createAccount(input: CreateAccountInput): BasicAuthAccount {
   );
 
   return account;
+}
+
+export function createAccountAndSession(input: {
+  account: CreateAccountInput & { id: string };
+  session: CreateSessionInput;
+}): { account: BasicAuthAccount; session: BasicAuthSession } {
+  const db = getBasicAuthDb();
+  return db.transaction(() => {
+    const account = createAccount(input.account);
+    if (input.session.accountId !== account.id) {
+      throw new Error('Session account does not match the account being created');
+    }
+    const session = createAuthSession(input.session);
+    return { account, session };
+  })();
 }
 
 export function ensureBootstrapAccount(input: CreateAccountInput): BasicAuthAccount {
