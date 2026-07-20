@@ -43,12 +43,18 @@
             />
           </UFormField>
 
-          <UFormField label="Password" name="password">
+          <UFormField
+            label="Password"
+            name="password"
+            hint="At least 8 characters"
+          >
             <UInput
               v-model="state.password"
               type="password"
               placeholder="••••••••"
               autocomplete="new-password"
+              minlength="8"
+              maxlength="512"
               required
               class="w-full"
             />
@@ -60,6 +66,8 @@
               type="password"
               placeholder="••••••••"
               autocomplete="new-password"
+              minlength="8"
+              maxlength="512"
               required
               class="w-full"
             />
@@ -140,9 +148,39 @@ function close(): void {
   emit('update:modelValue', false);
 }
 
+function validateClientSide(): string | null {
+  const email = state.email.trim();
+  if (!email || !email.includes('@')) {
+    return 'Enter a valid email address.';
+  }
+  if (state.password.length < 8) {
+    return 'Password must be at least 8 characters.';
+  }
+  if (state.password.length > 512) {
+    return 'Password is too long.';
+  }
+  if (state.password !== state.confirmPassword) {
+    return 'Passwords must match.';
+  }
+  return null;
+}
+
+function readFetchErrorMessage(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const data = (error as { data?: { statusMessage?: string; message?: string } }).data;
+  return data?.statusMessage || data?.message || null;
+}
+
 async function onSubmit(): Promise<void> {
   pending.value = true;
   errorMessage.value = '';
+
+  const clientError = validateClientSide();
+  if (clientError) {
+    errorMessage.value = clientError;
+    pending.value = false;
+    return;
+  }
 
   try {
     await $fetch('/api/basic-auth/register', {
@@ -163,14 +201,21 @@ async function onSubmit(): Promise<void> {
       typeof error === 'object' && error !== null && 'statusCode' in error
         ? Number((error as { statusCode?: number }).statusCode)
         : null;
+    const serverMessage = readFetchErrorMessage(error);
+
     if (statusCode === 400) {
-      errorMessage.value = 'Please check your input and try again.';
+      errorMessage.value =
+        serverMessage || 'Please check your email and password (min 8 characters).';
     } else if (statusCode === 403) {
-      errorMessage.value = 'Registration is restricted for this instance.';
+      errorMessage.value =
+        serverMessage || 'Registration is restricted for this instance.';
+    } else if (statusCode === 401) {
+      errorMessage.value = 'Email is already in use.';
     } else if (statusCode === 409) {
       errorMessage.value = 'Email is already in use.';
     } else {
-      errorMessage.value = 'Unable to register right now. Please try again.';
+      errorMessage.value =
+        serverMessage || 'Unable to register right now. Please try again.';
     }
   } finally {
     pending.value = false;

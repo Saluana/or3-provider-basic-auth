@@ -23,6 +23,28 @@ export async function parseBodyWithSchema<T extends z.ZodTypeAny>(
   const result = schema.safeParse(body);
 
   if (!result.success) {
+    const firstIssue = result.error.issues[0];
+    const path = firstIssue?.path?.join('.') || 'input';
+    const detail = firstIssue?.message || 'Invalid request';
+    // Prefer actionable messages for common auth fields without dumping full Zod trees.
+    if (path === 'password' || path === 'confirmPassword') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Password must be at least 8 characters.',
+      });
+    }
+    if (detail === 'Passwords must match') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Passwords must match.',
+      });
+    }
+    if (path === 'email') {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Enter a valid email address.',
+      });
+    }
     throw createInvalidRequestError();
   }
 
