@@ -2,7 +2,8 @@ import { resolve } from 'node:path';
 import {
   BASIC_AUTH_PROVIDER_ID,
   DEFAULT_ACCESS_TTL_SECONDS,
-  DEFAULT_REFRESH_TTL_SECONDS
+  DEFAULT_REFRESH_TTL_SECONDS,
+  REFRESH_ROTATION_GRACE_MS
 } from '../../lib/constants';
 
 export const BASIC_AUTH_INSECURE_DEV_ESCAPE_HATCH_ENV = 'OR3_BASIC_AUTH_ALLOW_INSECURE_DEV';
@@ -15,6 +16,7 @@ export interface BasicAuthConfig {
   refreshSecret: string;
   accessTtlSeconds: number;
   refreshTtlSeconds: number;
+  rotationGraceMs: number;
   dbPath: string;
   bootstrapEmail?: string;
   bootstrapPassword?: string;
@@ -78,6 +80,10 @@ export function getBasicAuthConfig(runtimeConfig?: ReturnType<typeof useRuntimeC
     refreshTtlSeconds: parsePositiveInt(
       process.env.OR3_BASIC_AUTH_REFRESH_TTL_SECONDS,
       DEFAULT_REFRESH_TTL_SECONDS
+    ),
+    rotationGraceMs: parsePositiveInt(
+      process.env.OR3_BASIC_AUTH_ROTATION_GRACE_MS,
+      REFRESH_ROTATION_GRACE_MS
     ),
     dbPath,
     bootstrapEmail: process.env.OR3_BASIC_AUTH_BOOTSTRAP_EMAIL,

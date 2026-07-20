@@ -47,6 +47,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
+import { silentRefreshOnce } from '../lib/silent-refresh.client';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthUserMenu from './BasicAuthUserMenu.client.vue';
@@ -56,7 +57,6 @@ const runtimeConfig = useRuntimeConfig();
 const signInModalOpen = ref(false);
 const registerModalOpen = ref(false);
 const changePasswordModalOpen = ref(false);
-let refreshRequest: Promise<boolean> | null = null;
 
 type SessionData = {
   authenticated?: boolean;
@@ -80,27 +80,6 @@ async function fetchSessionPayload(): Promise<SessionPayload> {
   });
 }
 
-async function tryRefreshTokens(): Promise<boolean> {
-  if (refreshRequest) {
-    return refreshRequest;
-  }
-
-  refreshRequest = (async () => {
-    try {
-      const response = await $fetch<{ ok?: boolean }>('/api/basic-auth/refresh?silent=1', {
-        method: 'POST'
-      });
-      return response?.ok === true;
-    } catch {
-      return false;
-    }
-  })().finally(() => {
-    refreshRequest = null;
-  });
-
-  return refreshRequest;
-}
-
 async function refreshSession(options: { allowSilentRefresh?: boolean } = {}): Promise<void> {
   const allowSilentRefresh = options.allowSilentRefresh ?? true;
 
@@ -116,7 +95,7 @@ async function refreshSession(options: { allowSilentRefresh?: boolean } = {}): P
     return;
   }
 
-  const didRefresh = await tryRefreshTokens();
+  const didRefresh = await silentRefreshOnce();
   if (!didRefresh) {
     return;
   }

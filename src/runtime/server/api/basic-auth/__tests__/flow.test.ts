@@ -157,6 +157,7 @@ describe('basic-auth endpoint flow', () => {
     process.env.OR3_BASIC_AUTH_REFRESH_SECRET = 'refresh-secret';
     process.env.OR3_BASIC_AUTH_ACCESS_TTL_SECONDS = '900';
     process.env.OR3_BASIC_AUTH_REFRESH_TTL_SECONDS = '3600';
+    process.env.OR3_BASIC_AUTH_ROTATION_GRACE_MS = '50';
 
     setRegistrationMode('open');
     inviteStore.validateInvite.mockReset().mockResolvedValue({
@@ -423,7 +424,7 @@ describe('basic-auth endpoint flow', () => {
     expect(getSetCookies(response).join(';')).toContain('or3_refresh=');
   });
 
-  it('refresh rotates sessions and replay of old refresh token is rejected', async () => {
+  it('refresh rotates sessions; concurrent refresh within grace reuses; later replay is rejected', async () => {
     const jar: CookieJar = new Map();
 
     const signIn = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
@@ -449,6 +450,20 @@ describe('basic-auth endpoint flow', () => {
     expect(refresh.status).toBe(200);
     applySetCookies(jar, getSetCookies(refresh));
     expect(jar.get('or3_refresh')).not.toBe(previousRefresh);
+
+    const concurrent = await fetch(`${baseUrl}/api/basic-auth/refresh`, {
+      method: 'POST',
+      headers: {
+        cookie: `or3_refresh=${previousRefresh}`,
+        origin: baseUrl
+      }
+    });
+
+    expect(concurrent.status).toBe(200);
+    applySetCookies(jar, getSetCookies(concurrent));
+
+    // Advance past the rotation grace window, then replay must revoke.
+    await new Promise((resolve) => setTimeout(resolve, 75));
 
     const replay = await fetch(`${baseUrl}/api/basic-auth/refresh`, {
       method: 'POST',

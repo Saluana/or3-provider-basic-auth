@@ -77,6 +77,16 @@ function runMigrations(db: Database.Database): void {
     `);
     db.pragma('user_version = 2');
   }
+
+  if (version < 3) {
+    db.exec(`
+      ALTER TABLE basic_auth_sessions
+        ADD COLUMN rotation_grace_until INTEGER;
+      ALTER TABLE basic_auth_sessions
+        ADD COLUMN rotation_grace_refresh_token TEXT;
+    `);
+    db.pragma('user_version = 3');
+  }
 }
 
 export function getBasicAuthDb(): Database.Database {

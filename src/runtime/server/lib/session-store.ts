@@ -2,10 +2,12 @@ import { randomUUID, timingSafeEqual } from 'node:crypto';
 import { getRequestHeader, type H3Event } from 'h3';
 import type { BasicAuthAccount, BasicAuthSession } from '../db/schema';
 import { getBasicAuthDb } from '../db/client';
+import { REFRESH_ROTATION_GRACE_MS } from '../../lib/constants';
 import {
   getClientIp as getProxyClientIp,
   normalizeProxyTrustConfig
 } from './request-identity';
+import { sealRotationGraceToken, unsealRotationGraceToken } from './rotation-grace';
 
 export interface CreateAccountInput {
   id?: string;
@@ -33,16 +35,29 @@ export interface RotationInput {
   currentRefreshHash: string;
   newSessionId: string;
   newRefreshHash: string;
+  /** Plaintext successor refresh token; sealed into the grace window for concurrent reuse. */
+  newRefreshToken: string;
   newExpiresAtMs: number;
   metadata?: SessionMetadata;
+  /** Injectable clock for tests. */
+  nowMs?: number;
+  /** Override grace window length for tests. */
+  graceMs?: number;
 }
 
-export interface RotationResult {
-  ok: boolean;
-  reason?: 'not_found' | 'expired' | 'revoked' | 'replayed';
-  accountId?: string;
-  sessionId?: string;
-}
+export type RotationResult =
+  | {
+      ok: true;
+      accountId: string;
+      sessionId: string;
+      reused: boolean;
+      /** Present when `reused` is true — the already-issued successor refresh token. */
+      refreshToken?: string;
+    }
+  | {
+      ok: false;
+      reason: 'not_found' | 'expired' | 'revoked' | 'replayed';
+    };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -61,6 +76,15 @@ function safeHexEquals(left: string, right: string): boolean {
   if (leftBuffer.length !== rightBuffer.length) return false;
 
   return timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function clearExpiredRotationGrace(sessionId: string): void {
+  const db = getBasicAuthDb();
+  db.prepare(
+    `UPDATE basic_auth_sessions
+     SET rotation_grace_until = NULL, rotation_grace_refresh_token = NULL
+     WHERE id = ?`
+  ).run(sessionId);
 }
 
 export function getSessionMetadataFromEvent(event: H3Event): SessionMetadata {
@@ -152,6 +176,8 @@ export function createAuthSession(input: CreateSessionInput): BasicAuthSession {
     created_at: createdAt,
     rotated_from_session_id: input.rotatedFromSessionId ?? null,
     replaced_by_session_id: null,
+    rotation_grace_until: null,
+    rotation_grace_refresh_token: null,
     ip_address: input.metadata?.ipAddress ?? null,
     user_agent: input.metadata?.userAgent ?? null
   };
@@ -159,8 +185,10 @@ export function createAuthSession(input: CreateSessionInput): BasicAuthSession {
   db.prepare(
     `INSERT INTO basic_auth_sessions (
       id, account_id, refresh_token_hash, expires_at, revoked_at, created_at,
-      rotated_from_session_id, replaced_by_session_id, ip_address, user_agent
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      rotated_from_session_id, replaced_by_session_id,
+      rotation_grace_until, rotation_grace_refresh_token,
+      ip_address, user_agent
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     row.id,
     row.account_id,
@@ -170,6 +198,8 @@ export function createAuthSession(input: CreateSessionInput): BasicAuthSession {
     row.created_at,
     row.rotated_from_session_id,
     row.replaced_by_session_id,
+    row.rotation_grace_until,
+    row.rotation_grace_refresh_token,
     row.ip_address,
     row.user_agent
   );
@@ -195,13 +225,55 @@ export function revokeSessionById(sessionId: string, revokedAtMs = Date.now()): 
 export function revokeAllSessionsForAccount(accountId: string, revokedAtMs = Date.now()): void {
   const db = getBasicAuthDb();
   db.prepare(
-    'UPDATE basic_auth_sessions SET revoked_at = COALESCE(revoked_at, ?) WHERE account_id = ?'
+    `UPDATE basic_auth_sessions
+     SET revoked_at = COALESCE(revoked_at, ?),
+         rotation_grace_until = NULL,
+         rotation_grace_refresh_token = NULL
+     WHERE account_id = ?`
   ).run(revokedAtMs, accountId);
+}
+
+function tryReuseRotatedSession(
+  currentSession: BasicAuthSession,
+  isSameTokenHash: boolean,
+  now: number
+): RotationResult | null {
+  if (currentSession.replaced_by_session_id === null || !isSameTokenHash) {
+    return null;
+  }
+
+  const graceUntil = currentSession.rotation_grace_until;
+  const sealedToken = currentSession.rotation_grace_refresh_token;
+
+  if (
+    typeof graceUntil === 'number' &&
+    graceUntil > now &&
+    typeof sealedToken === 'string' &&
+    sealedToken.length > 0
+  ) {
+    const refreshToken = unsealRotationGraceToken(sealedToken);
+    const successor = findSessionById(currentSession.replaced_by_session_id);
+
+    if (refreshToken && successor && isSessionUsable(successor)) {
+      return {
+        ok: true,
+        reused: true,
+        accountId: currentSession.account_id,
+        sessionId: successor.id,
+        refreshToken
+      };
+    }
+  }
+
+  // Grace expired or artifact missing — treat as replay.
+  clearExpiredRotationGrace(currentSession.id);
+  return null;
 }
 
 export function rotateSession(input: RotationInput): RotationResult {
   const db = getBasicAuthDb();
-  const now = Date.now();
+  const now = input.nowMs ?? Date.now();
+  const graceMs = input.graceMs ?? REFRESH_ROTATION_GRACE_MS;
 
   const currentSession = findSessionById(input.currentSessionId);
   if (!currentSession) {
@@ -219,10 +291,12 @@ export function rotateSession(input: RotationInput): RotationResult {
   );
 
   if (currentSession.revoked_at !== null) {
-    const replayedRotatedToken =
-      currentSession.replaced_by_session_id !== null && isSameTokenHash;
+    const reused = tryReuseRotatedSession(currentSession, isSameTokenHash, now);
+    if (reused) {
+      return reused;
+    }
 
-    if (replayedRotatedToken) {
+    if (currentSession.replaced_by_session_id !== null && isSameTokenHash) {
       revokeAllSessionsForAccount(currentSession.account_id, now);
       return {
         ok: false,
@@ -241,6 +315,8 @@ export function rotateSession(input: RotationInput): RotationResult {
     };
   }
 
+  const sealedGraceToken = sealRotationGraceToken(input.newRefreshToken);
+
   db.transaction(() => {
     createAuthSession({
       accountId: currentSession.account_id,
@@ -252,12 +328,18 @@ export function rotateSession(input: RotationInput): RotationResult {
     });
 
     db.prepare(
-      'UPDATE basic_auth_sessions SET revoked_at = ?, replaced_by_session_id = ? WHERE id = ?'
-    ).run(now, input.newSessionId, currentSession.id);
+      `UPDATE basic_auth_sessions
+       SET revoked_at = ?,
+           replaced_by_session_id = ?,
+           rotation_grace_until = ?,
+           rotation_grace_refresh_token = ?
+       WHERE id = ?`
+    ).run(now, input.newSessionId, now + graceMs, sealedGraceToken, currentSession.id);
   })();
 
   return {
     ok: true,
+    reused: false,
     accountId: currentSession.account_id,
     sessionId: input.newSessionId
   };

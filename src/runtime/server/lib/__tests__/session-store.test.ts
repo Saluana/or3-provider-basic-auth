@@ -52,6 +52,7 @@ describe('session store', () => {
       currentRefreshHash: hashRefreshToken(originalToken),
       newSessionId: 'sid-b',
       newRefreshHash: hashRefreshToken('refresh-token-b'),
+      newRefreshToken: 'refresh-token-b',
       newExpiresAtMs: Date.now() + 120_000
     });
 
@@ -91,17 +92,65 @@ describe('session store', () => {
     expect(findAccountByEmail('new@example.com')).toBeNull();
   });
 
-  it('detects replay and revokes all account sessions', async () => {
+  it('reuses successor tokens for concurrent refresh within the grace window', async () => {
     const account = createAccount({
       email: 'user@example.com',
       passwordHash: await hashPassword('pw-12345678')
     });
 
+    const now = Date.now();
     createAuthSession({
       accountId: account.id,
       sessionId: 'sid-a',
       refreshTokenHash: hashRefreshToken('token-a'),
-      expiresAtMs: Date.now() + 60_000
+      expiresAtMs: now + 60_000
+    });
+
+    const first = rotateSession({
+      currentSessionId: 'sid-a',
+      currentRefreshHash: hashRefreshToken('token-a'),
+      newSessionId: 'sid-b',
+      newRefreshHash: hashRefreshToken('token-b'),
+      newRefreshToken: 'token-b',
+      newExpiresAtMs: now + 60_000,
+      nowMs: now,
+      graceMs: 30_000
+    });
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+
+    const concurrent = rotateSession({
+      currentSessionId: 'sid-a',
+      currentRefreshHash: hashRefreshToken('token-a'),
+      newSessionId: 'sid-c',
+      newRefreshHash: hashRefreshToken('token-c'),
+      newRefreshToken: 'token-c',
+      newExpiresAtMs: now + 60_000,
+      nowMs: now + 1_000,
+      graceMs: 30_000
+    });
+
+    expect(concurrent.ok).toBe(true);
+    if (!concurrent.ok) return;
+    expect(concurrent.reused).toBe(true);
+    expect(concurrent.sessionId).toBe('sid-b');
+    expect(concurrent.refreshToken).toBe('token-b');
+    expect(isSessionUsable(findSessionById('sid-b'))).toBe(true);
+    expect(findSessionById('sid-c')).toBeNull();
+  });
+
+  it('detects replay after the grace window and revokes all account sessions', async () => {
+    const account = createAccount({
+      email: 'user@example.com',
+      passwordHash: await hashPassword('pw-12345678')
+    });
+
+    const now = Date.now();
+    createAuthSession({
+      accountId: account.id,
+      sessionId: 'sid-a',
+      refreshTokenHash: hashRefreshToken('token-a'),
+      expiresAtMs: now + 60_000
     });
 
     const rotation = rotateSession({
@@ -109,7 +158,10 @@ describe('session store', () => {
       currentRefreshHash: hashRefreshToken('token-a'),
       newSessionId: 'sid-b',
       newRefreshHash: hashRefreshToken('token-b'),
-      newExpiresAtMs: Date.now() + 60_000
+      newRefreshToken: 'token-b',
+      newExpiresAtMs: now + 60_000,
+      nowMs: now,
+      graceMs: 30_000
     });
     expect(rotation.ok).toBe(true);
 
@@ -118,10 +170,14 @@ describe('session store', () => {
       currentRefreshHash: hashRefreshToken('token-a'),
       newSessionId: 'sid-c',
       newRefreshHash: hashRefreshToken('token-c'),
-      newExpiresAtMs: Date.now() + 60_000
+      newRefreshToken: 'token-c',
+      newExpiresAtMs: now + 60_000,
+      nowMs: now + 31_000,
+      graceMs: 30_000
     });
 
     expect(replay.ok).toBe(false);
+    if (replay.ok) return;
     expect(replay.reason).toBe('replayed');
 
     expect(isSessionUsable(findSessionById('sid-b'))).toBe(false);

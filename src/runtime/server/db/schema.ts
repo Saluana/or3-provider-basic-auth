@@ -17,6 +17,10 @@ export interface BasicAuthSession {
   created_at: number;
   rotated_from_session_id: string | null;
   replaced_by_session_id: string | null;
+  /** Epoch ms until concurrent same-token refresh may reuse successor tokens. */
+  rotation_grace_until: number | null;
+  /** AES-GCM sealed successor refresh token, cleared after grace expires. */
+  rotation_grace_refresh_token: string | null;
   ip_address: string | null;
   user_agent: string | null;
 }

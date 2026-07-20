@@ -1,4 +1,6 @@
 import { registerClientAuthStatusResolver } from '~/composables/auth/useClientAuthStatus.client';
+import { registerClientSessionRecovery } from '~/composables/auth/useClientSessionRecovery';
+import { silentRefreshOnce } from '../lib/silent-refresh.client';
 
 type SessionPayload = {
   session?: {
@@ -17,19 +19,10 @@ async function fetchSession(): Promise<SessionPayload | null> {
   }
 }
 
-async function trySilentRefresh(): Promise<boolean> {
-  try {
-    const res = await $fetch<{ ok?: boolean }>('/api/basic-auth/refresh?silent=1', {
-      method: 'POST'
-    });
-    return res?.ok === true;
-  } catch {
-    return false;
-  }
-}
-
 export default defineNuxtPlugin(() => {
   if (import.meta.server) return;
+
+  registerClientSessionRecovery(async () => silentRefreshOnce());
 
   registerClientAuthStatusResolver(async () => {
     const first = await fetchSession();
@@ -44,7 +37,7 @@ export default defineNuxtPlugin(() => {
 
     // Session can briefly appear unauthenticated while access tokens are
     // rotating. Retry once via refresh endpoint before declaring logged out.
-    const refreshed = await trySilentRefresh();
+    const refreshed = await silentRefreshOnce();
     if (!refreshed) {
       return { ready: true, authenticated: false };
     }

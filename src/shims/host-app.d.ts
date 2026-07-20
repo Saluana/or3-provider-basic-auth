@@ -1,3 +1,9 @@
+declare module '~/composables/auth/useClientSessionRecovery' {
+  export type ClientSessionRecovery = () => boolean | Promise<boolean>;
+  export function registerClientSessionRecovery(recover: ClientSessionRecovery): void;
+  export function recoverClientSession(): Promise<boolean>;
+}
+
 declare module '~/composables/auth/useSessionContext' {
   import type { ComputedRef, Ref } from 'vue';
 
