@@ -1,6 +1,6 @@
 {
   "name": "or3-provider-basic-auth",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Basic-authentication provider for OR3 Chat with SSR session resolution, secure cookies, and provider-owned auth UI.",
   "license": "MIT",
   "type": "module",

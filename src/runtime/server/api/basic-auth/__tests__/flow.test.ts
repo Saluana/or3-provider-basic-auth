@@ -14,6 +14,7 @@ import { handleSignOut } from '../sign-out.post';
 import { handleChangePassword } from '../change-password.post';
 import { basicAuthProvider } from '../../../auth/basic-auth-provider';
 import { validateInviteRegistration } from '~~/server/auth/registration';
+import type { AuthWorkspaceStore } from '~~/server/auth/store/types';
 import {
   verifyAuthorizationContract,
   type AuthorizationCaseId,
@@ -135,7 +136,7 @@ describe('basic-auth endpoint flow', () => {
       async evaluate(id) {
         const decision = await validateInviteRegistration({
           event: { context: {} } as H3Event,
-          store: inviteStore as any,
+          store: inviteStore as unknown as AuthWorkspaceStore,
           mode: 'invite_only',
           email: id === 'invite-email-match'
             ? 'invited@example.test'
@@ -203,11 +204,13 @@ describe('basic-auth endpoint flow', () => {
 
   afterEach(async () => {
     if (server) {
+      const activeServer = server;
       await new Promise<void>((resolve, reject) => {
-        server!.close((error) => {
+        activeServer.close((error) => {
           if (error) reject(error);
           else resolve();
         });
+        activeServer.closeAllConnections();
       });
     }
     server = null;
