@@ -63,7 +63,6 @@ export default defineNitroPlugin(async () => {
     throw new Error(message);
   }
 
-  await ensureBootstrapUserIfConfigured();
   registerAuthProvider({
     id: BASIC_AUTH_PROVIDER_ID,
     order: 100,
@@ -72,4 +71,8 @@ export default defineNitroPlugin(async () => {
 
   registerProviderTokenBroker(BASIC_AUTH_PROVIDER_ID, createBasicAuthTokenBroker);
   registerProviderAdminAdapter(basicAuthAdminAdapter);
+
+  // Nitro 2 invokes plugins synchronously, so registration must happen before
+  // the first await for strict provider validation to observe this provider.
+  await ensureBootstrapUserIfConfigured();
 });
