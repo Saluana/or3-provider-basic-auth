@@ -6,6 +6,10 @@ const hashPasswordMock = vi.hoisted(() => vi.fn(async () => 'hashed-bootstrap-pa
 const findAccountByEmailMock = vi.hoisted(() => vi.fn());
 const ensureBootstrapAccountMock = vi.hoisted(() => vi.fn());
 
+vi.mock('nitropack/runtime/plugin', () => ({
+  defineNitroPlugin: (plugin: () => unknown) => plugin()
+}));
+
 vi.mock('~~/server/auth/registry', () => ({
   registerAuthProvider: registerAuthProviderMock
 }));
@@ -39,9 +43,6 @@ describe('basic-auth register plugin', () => {
     delete process.env.OR3_BASIC_AUTH_BOOTSTRAP_EMAIL;
     delete process.env.OR3_BASIC_AUTH_BOOTSTRAP_PASSWORD;
     delete process.env.OR3_BASIC_AUTH_ALLOW_INSECURE_DEV;
-
-    (globalThis as typeof globalThis & { defineNitroPlugin?: unknown }).defineNitroPlugin =
-      (plugin: () => unknown) => plugin();
 
     (globalThis as typeof globalThis & { useRuntimeConfig?: unknown }).useRuntimeConfig = () => ({
       auth: {
