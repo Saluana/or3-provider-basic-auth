@@ -1,6 +1,10 @@
 {
   "name": "or3-provider-basic-auth",
-  "version": "0.0.2",
+  "version": "0.0.3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Saluana/or3-provider-basic-auth.git"
+  },
   "description": "Basic-authentication provider for OR3 Chat with SSR session resolution, secure cookies, and provider-owned auth UI.",
   "license": "MIT",
   "type": "module",
