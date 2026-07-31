@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from '#imports';
 import { createError, setResponseHeader, type H3Event } from 'h3';
 import {
   getClientIp as getProxyClientIp,

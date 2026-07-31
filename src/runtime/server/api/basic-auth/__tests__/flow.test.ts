@@ -35,7 +35,14 @@ const coreRuntimeConfig = vi.hoisted(() => ({
 }));
 
 vi.mock('#imports', () => ({
-  useRuntimeConfig: () => coreRuntimeConfig
+  useRuntimeConfig: (...args: unknown[]) => {
+    const runtimeConfig = (
+      globalThis as typeof globalThis & {
+        useRuntimeConfig?: (...runtimeArgs: unknown[]) => unknown;
+      }
+    ).useRuntimeConfig;
+    return runtimeConfig ? runtimeConfig(...args) : coreRuntimeConfig;
+  }
 }));
 
 vi.mock('~~/server/auth/store/registry', () => ({

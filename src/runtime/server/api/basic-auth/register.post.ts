@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { useRuntimeConfig } from '#imports';
 import { createError, defineEventHandler, setCookie, type H3Event } from 'h3';
 import { z } from 'zod';
 import { getAuthWorkspaceStore } from '~~/server/auth/store/registry';

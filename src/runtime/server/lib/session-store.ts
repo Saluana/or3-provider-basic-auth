@@ -1,4 +1,5 @@
 import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { useRuntimeConfig } from '#imports';
 import { getRequestHeader, type H3Event } from 'h3';
 import type { BasicAuthAccount, BasicAuthSession } from '../db/schema';
 import { getBasicAuthDb } from '../db/client';

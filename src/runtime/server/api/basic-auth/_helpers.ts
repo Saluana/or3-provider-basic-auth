@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from '#imports';
 import { createError, readBody, setResponseHeader, type H3Event } from 'h3';
 import type { z } from 'zod';
 import { validateBasicAuthConfig } from '../../lib/config';

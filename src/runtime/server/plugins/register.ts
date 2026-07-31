@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from '#imports';
 import { defineNitroPlugin } from 'nitropack/runtime/plugin';
 import { BASIC_AUTH_PROVIDER_ID } from '../../lib/constants';
 import { registerAuthProvider } from '~~/server/auth/registry';

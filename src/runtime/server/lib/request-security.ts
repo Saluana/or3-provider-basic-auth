@@ -1,3 +1,4 @@
+import { useRuntimeConfig } from '#imports';
 import { createError, getRequestHeader, type H3Event } from 'h3';
 import { getProxyRequestHost, normalizeProxyTrustConfig } from './request-identity';
 

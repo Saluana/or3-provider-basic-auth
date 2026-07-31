@@ -1,3 +1,4 @@
+import { defineNuxtPlugin } from '#imports';
 import { registerClientAuthStatusResolver } from '~/composables/auth/useClientAuthStatus.client';
 import { registerClientSessionRecovery } from '~/composables/auth/useClientSessionRecovery';
 import { silentRefreshOnce } from '../lib/silent-refresh.client';

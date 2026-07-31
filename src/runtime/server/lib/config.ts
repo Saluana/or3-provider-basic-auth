@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import { useRuntimeConfig } from '#imports';
 import {
   BASIC_AUTH_PROVIDER_ID,
   DEFAULT_ACCESS_TTL_SECONDS,
