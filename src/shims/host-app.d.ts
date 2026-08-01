@@ -1,3 +1,18 @@
+declare module '~/composables/auth/useClientAuthStatus.client' {
+  export interface ClientAuthStatus {
+    ready: boolean;
+    authenticated: boolean;
+  }
+
+  export type ClientAuthStatusResolver = () =>
+    | ClientAuthStatus
+    | Promise<ClientAuthStatus>;
+
+  export function registerClientAuthStatusResolver(
+    resolver: ClientAuthStatusResolver
+  ): void;
+}
+
 declare module '~/composables/auth/useClientSessionRecovery' {
   export type ClientSessionRecovery = () => boolean | Promise<boolean>;
   export function registerClientSessionRecovery(recover: ClientSessionRecovery): void;
