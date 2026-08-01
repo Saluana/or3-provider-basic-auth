@@ -15,10 +15,6 @@ import { handleChangePassword } from '../change-password.post';
 import { basicAuthProvider } from '../../../auth/basic-auth-provider';
 import { validateInviteRegistration } from '~~/server/auth/registration';
 import type { AuthWorkspaceStore } from '~~/server/auth/store/types';
-import {
-  verifyAuthorizationContract,
-  type AuthorizationCaseId,
-} from '../../../../../../../or3-chat/shared/testing/contracts/authorization';
 
 type CookieJar = Map<string, string>;
 
@@ -127,33 +123,27 @@ describe('basic-auth endpoint flow', () => {
   let server: ReturnType<typeof createServer> | null = null;
   let baseUrl = '';
 
-  it('executes the shared invite signature and normalized-email contract', async () => {
-    const supported = new Set<AuthorizationCaseId>([
-      'invite-email-match', 'invite-email-mismatch',
-    ]);
+  it('validates invite signatures and normalized email addresses', async () => {
+    const cases = ['invite-email-match', 'invite-email-mismatch'] as const;
     inviteStore.validateInvite.mockResolvedValue({ ok: true });
     const token = createInviteToken({
       workspaceId: 'workspace-1',
       email: 'Invited@Example.Test',
       exp: Math.floor(Date.now() / 1000) + 60,
     }, 'invite-secret');
-    const result = await verifyAuthorizationContract({
-      name: 'basic-auth-register',
-      supports: supported,
-      async evaluate(id) {
-        const decision = await validateInviteRegistration({
-          event: { context: {} } as H3Event,
-          store: inviteStore as unknown as AuthWorkspaceStore,
-          mode: 'invite_only',
-          email: id === 'invite-email-match'
-            ? 'invited@example.test'
-            : 'other@example.test',
-          inviteToken: token,
-        });
-        return decision.allowed ? 'allow' : 'deny';
-      },
-    });
-    expect(result.executed).toEqual(Array.from(supported));
+
+    for (const id of cases) {
+      const decision = await validateInviteRegistration({
+        event: { context: {} } as H3Event,
+        store: inviteStore as unknown as AuthWorkspaceStore,
+        mode: 'invite_only',
+        email: id === 'invite-email-match'
+          ? 'invited@example.test'
+          : 'other@example.test',
+        inviteToken: token,
+      });
+      expect(decision.allowed).toBe(id === 'invite-email-match');
+    }
   });
 
   beforeEach(async () => {

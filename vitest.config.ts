@@ -6,11 +6,27 @@ export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
-      '~~/': path.resolve(__dirname, '../or3-chat') + '/',
-      '~~': path.resolve(__dirname, '../or3-chat'),
-      '~/': path.resolve(__dirname, '../or3-chat/app') + '/',
-      '~': path.resolve(__dirname, '../or3-chat/app'),
-      '#imports': path.resolve(__dirname, '../or3-chat/tests/stubs/nuxt-imports.ts')
+      '#imports': path.resolve(__dirname, 'src/test-shims/nuxt-imports.ts'),
+      '~~/server/auth/registration': path.resolve(
+        __dirname,
+        'src/test-shims/server-auth-registration.ts'
+      ),
+      '~~/server/auth/registry': path.resolve(
+        __dirname,
+        'src/test-shims/server-auth-registry.ts'
+      ),
+      '~~/server/auth/store/registry': path.resolve(
+        __dirname,
+        'src/test-shims/server-auth-store-registry.ts'
+      ),
+      '~~/server/auth/token-broker/registry': path.resolve(
+        __dirname,
+        'src/test-shims/server-auth-token-broker-registry.ts'
+      ),
+      '~~/server/admin/providers/registry': path.resolve(
+        __dirname,
+        'src/test-shims/server-admin-providers-registry.ts'
+      )
     }
   },
   test: {
