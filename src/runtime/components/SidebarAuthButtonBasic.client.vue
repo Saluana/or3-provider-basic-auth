@@ -46,6 +46,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue';
+import { useRuntimeConfig } from '#imports';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 import { silentRefreshOnce } from '../lib/silent-refresh.client';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
