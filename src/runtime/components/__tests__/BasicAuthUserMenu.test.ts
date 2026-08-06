@@ -53,4 +53,35 @@ describe('BasicAuthUserMenu', () => {
 
     expect(wrapper.emitted('signed-out')).toBeTruthy();
   });
+
+  it('uses injected popover placement when provided by the host', () => {
+    const wrapper = mount(BasicAuthUserMenu, {
+      props: {
+        email: 'user@example.com',
+      },
+      global: {
+        provide: {
+          'or3:auth-ui-popover-content': {
+            side: 'top',
+            align: 'center',
+            sideOffset: 8,
+          },
+        },
+        components: {
+          UButton: UButtonStub,
+          UPopover: defineComponent({
+            props: {
+              content: { type: Object, default: () => ({}) },
+            },
+            template:
+              '<div :data-side="content.side" :data-align="content.align"><slot /><slot name="content" /></div>',
+          }),
+          UIcon: true,
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-side="top"]').exists()).toBe(true);
+    expect(wrapper.find('[data-align="center"]').exists()).toBe(true);
+  });
 });

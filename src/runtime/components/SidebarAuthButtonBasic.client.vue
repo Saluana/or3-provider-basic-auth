@@ -17,8 +17,8 @@
     >
       <template #default>
         <span class="flex flex-col items-center gap-1 w-full">
-          <UIcon name="i-lucide-log-in" class="h-[18px] w-[18px]" />
-          <span class="text-[7px] uppercase tracking-wider whitespace-nowrap">
+          <UIcon name="lucide:log-in" class="h-[18px] w-[18px]" />
+          <span class="sidebar-rail-caption text-[7px] uppercase tracking-wider whitespace-nowrap">
             Login
           </span>
         </span>
