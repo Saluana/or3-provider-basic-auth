@@ -40,6 +40,7 @@
     "build": "nuxt-module-build build",
     "lint": "eslint \"src/**/*.{ts,d.ts,vue}\"",
     "type-check": "tsc -p tsconfig.typecheck.json --noEmit",
+    "type-check:standalone": "tsc -p tsconfig.typecheck.json --noEmit",
     "test": "vitest run"
   },
   "publishConfig": {
