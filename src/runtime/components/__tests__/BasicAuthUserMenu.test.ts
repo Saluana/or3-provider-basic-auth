@@ -84,4 +84,38 @@ describe('BasicAuthUserMenu', () => {
     expect(wrapper.find('[data-side="top"]').exists()).toBe(true);
     expect(wrapper.find('[data-align="center"]').exists()).toBe(true);
   });
+
+  it('renders a System-matched more-row when layout prop is more-sheet', () => {
+    const UIconStub = defineComponent({
+      props: {
+        name: { type: String, default: '' },
+      },
+      template: '<span class="u-icon-stub" :data-name="name" />',
+    });
+
+    const wrapper = mount(BasicAuthUserMenu, {
+      props: {
+        email: 'user@example.com',
+        layout: 'more-sheet',
+      },
+      global: {
+        components: {
+          UButton: UButtonStub,
+          UPopover: UPopoverStub,
+          UIcon: UIconStub,
+        },
+      },
+    });
+
+    const trigger = wrapper.find('button.more-row[aria-label="Account menu"]');
+    expect(trigger.exists()).toBe(true);
+    expect(trigger.find('.more-row-icon').exists()).toBe(true);
+    expect(trigger.find('.more-row-label').text()).toBe('Account');
+    expect(trigger.find('.more-row-desc').text()).toContain(
+      'Manage your profile'
+    );
+    expect(
+      trigger.find('.u-icon-stub[data-name="lucide:chevron-right"]').exists()
+    ).toBe(true);
+  });
 });

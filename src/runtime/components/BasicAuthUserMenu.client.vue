@@ -5,7 +5,29 @@
     :content="popoverContent"
     :ui="{ content: 'z-[280] max-w-[240px] p-0 border-none bg-transparent shadow-none' }"
   >
+    <!-- More sheet: identical anatomy to System .more-row -->
+    <button
+      v-if="isMoreSheetLayout"
+      type="button"
+      class="more-row"
+      aria-label="Account menu"
+    >
+      <span class="more-row-icon more-row-icon--admin" aria-hidden="true">
+        <UIcon name="lucide:user" />
+      </span>
+      <span class="more-row-copy">
+        <span class="more-row-label">Account</span>
+        <span class="more-row-desc">Manage your profile & settings</span>
+      </span>
+      <UIcon
+        name="lucide:chevron-right"
+        class="more-row-chevron"
+        aria-hidden="true"
+      />
+    </button>
+
     <UButton
+      v-else
       v-bind="triggerButtonProps"
       type="button"
       aria-label="Account menu"
@@ -13,7 +35,9 @@
       <template #default>
         <span class="flex flex-col items-center gap-1 w-full">
           <UIcon name="lucide:user" class="h-[18px] w-[18px]" />
-          <span class="sidebar-rail-caption text-[7px] uppercase tracking-wider whitespace-nowrap">
+          <span
+            class="sidebar-rail-caption text-[7px] uppercase tracking-wider whitespace-nowrap"
+          >
             Account
           </span>
         </span>
@@ -24,17 +48,22 @@
       <div
         class="basic-auth-account-menu w-[220px] rounded-[var(--md-border-radius)] border-[length:var(--md-border-width)] border-[color:var(--md-border-color)] bg-[var(--md-surface)] overflow-hidden theme-shadow"
       >
-        <!-- User identity section -->
         <div class="px-4 pt-4 pb-3">
           <div class="flex items-center gap-3">
-            <div class="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--md-success)]/15 text-[var(--md-success)] shrink-0">
+            <div
+              class="flex items-center justify-center w-8 h-8 rounded-full bg-[var(--md-success)]/15 text-[var(--md-success)] shrink-0"
+            >
               <UIcon name="lucide:user" class="w-4 h-4" />
             </div>
             <div class="min-w-0">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--md-on-surface)]/50 mb-0.5">
+              <p
+                class="text-[10px] uppercase tracking-wider text-[var(--md-on-surface)]/50 mb-0.5"
+              >
                 Signed in as
               </p>
-              <p class="text-xs font-medium text-[var(--md-on-surface)] break-all leading-tight">
+              <p
+                class="text-xs font-medium text-[var(--md-on-surface)] break-all leading-tight"
+              >
                 {{ email }}
               </p>
             </div>
@@ -43,14 +72,16 @@
 
         <div class="h-[var(--md-border-width)] bg-[var(--md-border-color)] mx-3" />
 
-        <!-- Actions -->
         <div class="p-2 space-y-1">
           <button
             type="button"
             class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-[var(--md-on-surface)] rounded-[var(--md-border-radius)] hover:bg-[var(--md-surface-hover)] active:bg-[var(--md-surface-active)] transition-colors text-left"
             @click="onChangePassword"
           >
-            <UIcon name="lucide:key-round" class="w-4 h-4 text-[var(--md-on-surface)]/60 shrink-0" />
+            <UIcon
+              name="lucide:key-round"
+              class="w-4 h-4 text-[var(--md-on-surface)]/60 shrink-0"
+            />
             Change Password
           </button>
 
@@ -75,10 +106,16 @@ import {
   AUTH_UI_POPOVER_CONTENT_KEY,
   type AuthUiPopoverContent,
 } from '../lib/auth-ui-popover';
+import {
+  AUTH_UI_LAYOUT_KEY,
+  type AuthUiLayout,
+} from '../lib/auth-ui-layout';
 
-defineProps<{
+const props = defineProps<{
   email?: string;
   displayName?: string;
+  /** Explicit host layout — preferred over inject (cross-package inject can miss). */
+  layout?: AuthUiLayout;
 }>();
 
 const emit = defineEmits<{
@@ -99,6 +136,14 @@ const DEFAULT_POPOVER_CONTENT: AuthUiPopoverContent = {
 const injectedPopoverContent = inject<AuthUiPopoverContent | null>(
   AUTH_UI_POPOVER_CONTENT_KEY,
   null
+);
+
+const injectedLayout = inject<AuthUiLayout | null>(AUTH_UI_LAYOUT_KEY, null);
+
+const isMoreSheetLayout = computed(
+  () =>
+    props.layout === 'more-sheet' ||
+    (injectedLayout ? unref(injectedLayout) : 'rail') === 'more-sheet'
 );
 
 const popoverContent = computed<AuthUiPopoverContent>(() => ({

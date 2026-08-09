@@ -4,9 +4,31 @@
       v-if="isSignedIn"
       :email="sessionUser?.email"
       :display-name="sessionUser?.displayName"
+      :layout="resolvedLayout"
       @signed-out="onSignedOut"
       @change-password="changePasswordModalOpen = true"
     />
+
+    <button
+      v-else-if="isMoreSheetLayout"
+      type="button"
+      class="more-row"
+      aria-label="Login"
+      @click="signInModalOpen = true"
+    >
+      <span class="more-row-icon more-row-icon--admin" aria-hidden="true">
+        <UIcon name="lucide:log-in" />
+      </span>
+      <span class="more-row-copy">
+        <span class="more-row-label">Login</span>
+        <span class="more-row-desc">Manage your profile & settings</span>
+      </span>
+      <UIcon
+        name="lucide:chevron-right"
+        class="more-row-chevron"
+        aria-hidden="true"
+      />
+    </button>
 
     <UButton
       v-else
@@ -18,7 +40,9 @@
       <template #default>
         <span class="flex flex-col items-center gap-1 w-full">
           <UIcon name="lucide:log-in" class="h-[18px] w-[18px]" />
-          <span class="sidebar-rail-caption text-[7px] uppercase tracking-wider whitespace-nowrap">
+          <span
+            class="sidebar-rail-caption text-[7px] uppercase tracking-wider whitespace-nowrap"
+          >
             Login
           </span>
         </span>
@@ -45,14 +69,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, inject, nextTick, onMounted, ref, unref } from 'vue';
 import { useRuntimeConfig } from '#imports';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
+import {
+  AUTH_UI_LAYOUT_KEY,
+  type AuthUiLayout,
+} from '../lib/auth-ui-layout';
 import { silentRefreshOnce } from '../lib/silent-refresh.client';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthUserMenu from './BasicAuthUserMenu.client.vue';
 import BasicAuthChangePasswordModal from './BasicAuthChangePasswordModal.client.vue';
+
+const props = defineProps<{
+  /** Explicit host layout — preferred over inject (cross-package inject can miss). */
+  layout?: AuthUiLayout;
+}>();
 
 const runtimeConfig = useRuntimeConfig();
 const signInModalOpen = ref(false);
@@ -77,11 +110,13 @@ const session = ref<SessionData | null>(null);
 
 async function fetchSessionPayload(): Promise<SessionPayload> {
   return await $fetch<SessionPayload>('/api/auth/session', {
-    cache: 'no-store'
+    cache: 'no-store',
   });
 }
 
-async function refreshSession(options: { allowSilentRefresh?: boolean } = {}): Promise<void> {
+async function refreshSession(
+  options: { allowSilentRefresh?: boolean } = {}
+): Promise<void> {
   const allowSilentRefresh = options.allowSilentRefresh ?? true;
 
   try {
@@ -116,9 +151,23 @@ const isBasicAuthProvider = computed(() => {
 });
 
 const isSignedIn = computed(
-  () => session.value?.authenticated === true && session.value.provider === BASIC_AUTH_PROVIDER_ID
+  () =>
+    session.value?.authenticated === true &&
+    session.value.provider === BASIC_AUTH_PROVIDER_ID
 );
 const sessionUser = computed(() => session.value?.user);
+
+const injectedLayout = inject<AuthUiLayout | null>(AUTH_UI_LAYOUT_KEY, null);
+const resolvedLayout = computed<AuthUiLayout>(() => {
+  if (props.layout === 'more-sheet' || props.layout === 'rail') {
+    return props.layout;
+  }
+  return (injectedLayout ? unref(injectedLayout) : 'rail') as AuthUiLayout;
+});
+const isMoreSheetLayout = computed(
+  () => resolvedLayout.value === 'more-sheet'
+);
+
 const loginButtonProps = {
   block: true,
   variant: 'ghost' as const,
@@ -126,8 +175,8 @@ const loginButtonProps = {
   class:
     'theme-btn h-[48px] w-[48px] p-0! flex flex-col items-center justify-center gap-1 py-1.5 bg-transparent border-[length:var(--md-border-width)] border-[color:var(--md-primary)]/30 rounded-[var(--md-border-radius)] text-[var(--md-primary)] hover:bg-[var(--md-primary)]/15 active:bg-[var(--md-primary)]/25 transition-colors duration-150 shadow-none',
   ui: {
-    base: 'justify-center shadow-none'
-  }
+    base: 'justify-center shadow-none',
+  },
 };
 
 function notifyAuthSessionChanged(): void {
