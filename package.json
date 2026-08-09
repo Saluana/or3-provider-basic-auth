@@ -1,6 +1,6 @@
 {
   "name": "or3-provider-basic-auth",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/Saluana/or3-provider-basic-auth.git"
@@ -48,7 +48,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.4.1",
+    "better-sqlite3": "^13.0.3",
     "jsonwebtoken": "^9.0.2",
     "zod": "^4.1.12"
   },
