@@ -3,7 +3,7 @@
     v-model:open="isOpen"
     portal
     :content="popoverContent"
-    :ui="{ content: 'z-[280] max-w-[240px] p-0 border-none bg-transparent shadow-none' }"
+    :ui="{ content: 'basic-auth-account-popover max-w-[240px] p-0 border-none bg-transparent shadow-none' }"
   >
     <!-- More sheet: identical anatomy to System .more-row -->
     <button
@@ -180,3 +180,11 @@ async function onSignOut(): Promise<void> {
   }
 }
 </script>
+
+<!-- Unscoped because UPopover teleports its content to <body>. -->
+<style>
+.basic-auth-account-popover,
+[data-reka-popper-content-wrapper]:has(.basic-auth-account-menu) {
+  z-index: 100 !important;
+}
+</style>

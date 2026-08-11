@@ -216,3 +216,11 @@ onMounted(() => {
   void refreshSession();
 });
 </script>
+
+<!-- Basic-auth dialogs are teleported to <body>, outside the host sidebar. -->
+<style>
+.basic-auth-modal-overlay,
+.basic-auth-modal-content {
+  z-index: 100 !important;
+}
+</style>

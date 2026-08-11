@@ -86,7 +86,8 @@
 import { computed, reactive, ref } from 'vue';
 
 const modalUi = {
-  content: 'sm:max-w-[380px]',
+  overlay: 'basic-auth-modal-overlay',
+  content: 'basic-auth-modal-content sm:max-w-[380px]',
 };
 
 const props = defineProps<{
