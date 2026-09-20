@@ -11,7 +11,10 @@
       "~~/server/auth/store/types": ["./src/shims/server-auth-store-types.d.ts"],
       "~~/server/auth/registration": ["./src/shims/server-auth-registration.d.ts"],
       "~~/server/admin/providers/types": ["./src/shims/server-admin-providers-types.d.ts"],
-      "~~/server/admin/providers/registry": ["./src/shims/server-admin-providers-registry.d.ts"]
+      "~~/server/admin/providers/registry": ["./src/shims/server-admin-providers-registry.d.ts"],
+      "~~/server/utils/plugins/isolation/activation-registry": [
+        "./src/shims/server-isolation-activation-registry.d.ts"
+      ]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts"],

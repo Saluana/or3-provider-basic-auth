@@ -223,6 +223,46 @@ export function revokeSessionById(sessionId: string, revokedAtMs = Date.now()): 
   ).run(revokedAtMs, sessionId);
 }
 
+/**
+ * Revoke a session and every successor it was rotated into, clearing rotation
+ * grace on each. A replayed rotated refresh token therefore cannot recover its
+ * successor after sign-out.
+ */
+export function revokeSessionChain(sessionId: string, revokedAtMs = Date.now()): void {
+  const db = getBasicAuthDb();
+  db.transaction(() => {
+    const visited = new Set<string>();
+    let currentId: string | null = sessionId;
+    while (currentId && !visited.has(currentId)) {
+      visited.add(currentId);
+      const session = findSessionById(currentId);
+      if (!session) break;
+      db.prepare(
+        `UPDATE basic_auth_sessions
+         SET revoked_at = COALESCE(revoked_at, ?),
+             rotation_grace_until = NULL,
+             rotation_grace_refresh_token = NULL
+         WHERE id = ?`
+      ).run(revokedAtMs, currentId);
+      currentId = session.replaced_by_session_id;
+    }
+  })();
+}
+
+/** First usable session walking from `sessionId` through rotation successors. */
+export function findUsableSessionInChain(sessionId: string): BasicAuthSession | null {
+  const visited = new Set<string>();
+  let current = findSessionById(sessionId);
+  while (current && !visited.has(current.id)) {
+    if (isSessionUsable(current)) return current;
+    visited.add(current.id);
+    current = current.replaced_by_session_id
+      ? findSessionById(current.replaced_by_session_id)
+      : null;
+  }
+  return null;
+}
+
 export function revokeAllSessionsForAccount(accountId: string, revokedAtMs = Date.now()): void {
   const db = getBasicAuthDb();
   db.prepare(

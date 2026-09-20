@@ -72,6 +72,7 @@ Strict-mode behavior:
 - Access JWTs are short-lived and validated by `basicAuthProvider.getSession(event)`.
 - Refresh tokens are rotated and hashed at rest; replay attempts revoke active sessions.
 - The refresh cookie is scoped to `/api` so `/api/auth/session` can transparently rotate expired access tokens during session resolution.
+- Sign-out never refreshes the session: the user is resolved without rotation, and revoking a token also revokes the sessions it was rotated into and clears their rotation grace, so a replayed predecessor cannot recover a successor after logout.
 - The SQLite DB file and directory are hardened to mode `0600`/`0700`; the DB uses WAL journaling.
 
 ## Runtime entrypoints

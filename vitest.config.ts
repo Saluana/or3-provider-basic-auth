@@ -26,6 +26,10 @@ export default defineConfig({
       '~~/server/admin/providers/registry': path.resolve(
         __dirname,
         'src/test-shims/server-admin-providers-registry.ts'
+      ),
+      '~~/server/utils/plugins/isolation/activation-registry': path.resolve(
+        __dirname,
+        'src/test-shims/server-isolation-activation-registry.ts'
       )
     }
   },
