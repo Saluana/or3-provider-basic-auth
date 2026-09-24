@@ -11,6 +11,16 @@ function isProduction(): boolean {
   return process.env.NODE_ENV === 'production';
 }
 
+export function accessCookieName(): string {
+  const scope = process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE;
+  return scope ? `${ACCESS_COOKIE_NAME}_${scope}` : ACCESS_COOKIE_NAME;
+}
+
+export function refreshCookieName(): string {
+  const scope = process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE;
+  return scope ? `${REFRESH_COOKIE_NAME}_${scope}` : REFRESH_COOKIE_NAME;
+}
+
 function refreshCookieBase() {
   return {
     httpOnly: true as const,
@@ -20,7 +30,7 @@ function refreshCookieBase() {
 }
 
 export function setAccessCookie(event: H3Event, token: string, maxAgeSeconds: number): void {
-  setCookie(event, ACCESS_COOKIE_NAME, token, {
+  setCookie(event, accessCookieName(), token, {
     httpOnly: true,
     sameSite: 'lax',
     secure: isProduction(),
@@ -31,12 +41,12 @@ export function setAccessCookie(event: H3Event, token: string, maxAgeSeconds: nu
 
 export function setRefreshCookie(event: H3Event, token: string, maxAgeSeconds: number): void {
   // Drop legacy-path cookie so browsers don't keep a stale refresh token around.
-  deleteCookie(event, REFRESH_COOKIE_NAME, {
+  deleteCookie(event, refreshCookieName(), {
     ...refreshCookieBase(),
     path: LEGACY_REFRESH_COOKIE_PATH
   });
 
-  setCookie(event, REFRESH_COOKIE_NAME, token, {
+  setCookie(event, refreshCookieName(), token, {
     ...refreshCookieBase(),
     path: REFRESH_COOKIE_PATH,
     maxAge: maxAgeSeconds
@@ -44,19 +54,19 @@ export function setRefreshCookie(event: H3Event, token: string, maxAgeSeconds: n
 }
 
 export function clearAuthCookies(event: H3Event): void {
-  deleteCookie(event, ACCESS_COOKIE_NAME, {
+  deleteCookie(event, accessCookieName(), {
     httpOnly: true,
     sameSite: 'lax',
     secure: isProduction(),
     path: ACCESS_COOKIE_PATH
   });
 
-  deleteCookie(event, REFRESH_COOKIE_NAME, {
+  deleteCookie(event, refreshCookieName(), {
     ...refreshCookieBase(),
     path: REFRESH_COOKIE_PATH
   });
 
-  deleteCookie(event, REFRESH_COOKIE_NAME, {
+  deleteCookie(event, refreshCookieName(), {
     ...refreshCookieBase(),
     path: LEGACY_REFRESH_COOKIE_PATH
   });

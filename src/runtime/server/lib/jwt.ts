@@ -1,7 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { getCookie } from 'h3';
 import jwt, { type JwtPayload } from 'jsonwebtoken';
-import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from '../../lib/constants';
+import { accessCookieName, refreshCookieName } from './cookies';
 import { getBasicAuthConfig } from './config';
 
 interface AccessClaimsInput {
@@ -118,11 +118,11 @@ export async function verifyRefreshToken(token: string): Promise<BasicRefreshTok
 }
 
 export function getAccessTokenFromEvent(event: Parameters<typeof getCookie>[0]): string | null {
-  return getCookie(event, ACCESS_COOKIE_NAME) ?? null;
+  return getCookie(event, accessCookieName()) ?? null;
 }
 
 export function getRefreshTokenFromEvent(event: Parameters<typeof getCookie>[0]): string | null {
-  return getCookie(event, REFRESH_COOKIE_NAME) ?? null;
+  return getCookie(event, refreshCookieName()) ?? null;
 }
 
 export function hashRefreshToken(token: string): string {

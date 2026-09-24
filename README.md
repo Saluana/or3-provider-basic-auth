@@ -51,6 +51,7 @@ Optional:
 - `OR3_BASIC_AUTH_BOOTSTRAP_PASSWORD`
 - `OR3_BASIC_AUTH_RATE_LIMIT_BACKEND` (`sqlite` default; `memory` is per-process and intended for single-instance development only)
 - `OR3_BASIC_AUTH_ALLOW_INSECURE_DEV` (`true` in non-production to start with missing secrets instead of failing)
+- `OR3_PLUGIN_DEV_COOKIE_SCOPE` (set by the isolated plugin development launcher to keep browser sessions separate across local hosts)
 
 Registration mode is a core-auth policy, not a provider setting:
 

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
   getAccessTokenFromEvent,
@@ -26,7 +26,12 @@ describe('jwt helpers', () => {
     process.env.OR3_BASIC_AUTH_ACCESS_TTL_SECONDS = '1';
     process.env.OR3_BASIC_AUTH_REFRESH_TTL_SECONDS = '10';
     process.env.OR3_BASIC_AUTH_DB_PATH = ':memory:';
+    delete process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE;
     applyRuntimeConfigStub();
+  });
+
+  afterEach(() => {
+    delete process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE;
   });
 
   it('signs and verifies access tokens', async () => {
@@ -118,6 +123,17 @@ describe('jwt helpers', () => {
     } as unknown as Parameters<typeof getAccessTokenFromEvent>[0];
 
     expect(getAccessTokenFromEvent(event)).toBe('token-123');
+  });
+
+  it('reads only the cookie for the active plugin development profile', () => {
+    process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE = 'profile1';
+    const event = {
+      node: { req: { headers: { cookie: 'or3_access=ordinary; or3_access_profile1=local; or3_access_profile2=other' } } }
+    } as unknown as Parameters<typeof getAccessTokenFromEvent>[0];
+
+    expect(getAccessTokenFromEvent(event)).toBe('local');
+    process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE = 'profile2';
+    expect(getAccessTokenFromEvent(event)).toBe('other');
   });
 
   it('hashes refresh tokens deterministically', () => {
