@@ -24,13 +24,18 @@ import {
   getSessionMetadataFromEvent
 } from '../../lib/session-store';
 import { enforceMutationOriginPolicy } from '../../lib/request-security';
+import { newPasswordFitsBcrypt } from '../../../password-policy';
 import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
 
 const registerSchema = z
   .object({
     email: z.string().email().max(320),
-    password: z.string().min(8).max(512),
-    confirmPassword: z.string().min(8).max(512),
+    password: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
+      message: 'Password must be 72 UTF-8 bytes or fewer.'
+    }),
+    confirmPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
+      message: 'Password must be 72 UTF-8 bytes or fewer.'
+    }),
     displayName: z.string().trim().min(1).max(120).optional(),
     inviteToken: z.string().trim().min(1).max(4096).optional()
   })

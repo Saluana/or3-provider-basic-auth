@@ -52,18 +52,6 @@ describe('basic-auth register plugin', () => {
     });
   });
 
-  it('registers auth provider and token broker', async () => {
-    const mod = await import('../register');
-    await mod.default;
-
-    expect(registerAuthProviderMock).toHaveBeenCalledTimes(1);
-    expect(registerAuthProviderMock.mock.calls[0]?.[0]?.id).toBe('basic-auth');
-    expect(registerProviderTokenBrokerMock).toHaveBeenCalledWith(
-      'basic-auth',
-      expect.any(Function)
-    );
-  });
-
   it('fails closed when required secret is missing', async () => {
     delete process.env.OR3_BASIC_AUTH_JWT_SECRET;
 

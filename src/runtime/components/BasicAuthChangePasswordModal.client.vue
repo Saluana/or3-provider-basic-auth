@@ -31,7 +31,7 @@
 
           <USeparator />
 
-          <UFormField label="New Password" name="newPassword">
+          <UFormField label="New Password" name="newPassword" hint="At least 8 characters; at most 72 UTF-8 bytes">
             <UInput
               v-model="state.newPassword"
               type="password"
@@ -83,6 +83,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
+import { newPasswordFitsBcrypt } from '../password-policy';
 
 const modalUi = {
   overlay: 'basic-auth-modal-overlay',
@@ -118,6 +119,14 @@ function close(): void {
 }
 
 async function onSubmit(): Promise<void> {
+  if (state.newPassword.length < 8) {
+    errorMessage.value = 'New password must be at least 8 characters.';
+    return;
+  }
+  if (!newPasswordFitsBcrypt(state.newPassword)) {
+    errorMessage.value = 'New password must be 72 UTF-8 bytes or fewer.';
+    return;
+  }
   if (state.newPassword !== state.confirmNewPassword) {
     errorMessage.value = 'Passwords do not match';
     return;

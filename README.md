@@ -92,6 +92,8 @@ Strict-mode behavior:
 | `src/runtime/plugins/auth-status.client.ts` | Client auth-status resolver + silent-refresh recovery |
 | `src/runtime/components/*.client.vue` | Provider-owned auth UI (modals, user menu, sidebar button, lock page) |
 
+New passwords must be at least eight characters and no more than 72 UTF-8 bytes, matching bcrypt's input limit. Existing account hashes remain verifiable, including passwords created before this limit was enforced.
+
 The registered sidebar auth adapter accepts `layout="rail"` (default) and
 `layout="more-sheet"`. In the More sheet it renders Account/Login with the
 host's shared full-width `.more-row` structure, while keeping the existing

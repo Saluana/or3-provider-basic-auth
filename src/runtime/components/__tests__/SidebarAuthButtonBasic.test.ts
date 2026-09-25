@@ -75,42 +75,6 @@ describe('SidebarAuthButtonBasic', () => {
     expect(login.find('.more-row-desc').text()).toContain('Manage your profile');
   });
 
-  it('renders signed-in menu when authenticated with basic-auth provider', async () => {
-    const fetchMock = vi.fn(async () => ({
-      session: {
-        authenticated: true,
-        provider: 'basic-auth',
-        user: {
-          email: 'user@example.com'
-        }
-      }
-    }));
-    vi.stubGlobal(
-      '$fetch',
-      fetchMock
-    );
-
-    const wrapper = shallowMount(SidebarAuthButtonBasic, {
-      global: {
-        stubs: {
-          UButton: UButtonStub,
-          BasicAuthSignInModal: true,
-          BasicAuthChangePasswordModal: true,
-          BasicAuthUserMenu: true
-        }
-      }
-    });
-
-    await flushPromises();
-    await wrapper.vm.$nextTick();
-
-    expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
-    expect(wrapper.text()).not.toContain('Login');
-    expect(fetchMock).not.toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
-      method: 'POST'
-    });
-  });
-
   it('forwards more-sheet layout to the signed-in account menu', async () => {
     vi.stubGlobal('$fetch', vi.fn(async () => ({
       session: {

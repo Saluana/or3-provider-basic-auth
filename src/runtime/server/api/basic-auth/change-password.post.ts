@@ -11,13 +11,18 @@ import {
 import { enforceMutationOriginPolicy } from '../../lib/request-security';
 import { basicAuthProvider } from '../../auth/basic-auth-provider';
 import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
+import { newPasswordFitsBcrypt } from '../../../password-policy';
 
 const changePasswordSchema = z
   .object({
     // Existing accounts may have legacy short passwords; only new password is length-enforced.
     currentPassword: z.string().min(1).max(512),
-    newPassword: z.string().min(8).max(512),
-    confirmNewPassword: z.string().min(8).max(512)
+    newPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
+      message: 'Password must be 72 UTF-8 bytes or fewer.'
+    }),
+    confirmNewPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
+      message: 'Password must be 72 UTF-8 bytes or fewer.'
+    })
   })
   .refine((input) => input.newPassword === input.confirmNewPassword, {
     message: 'Passwords must match'

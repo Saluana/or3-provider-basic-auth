@@ -120,4 +120,29 @@ describe('BasicAuthChangePasswordModal', () => {
 
     expect(wrapper.text()).toContain('Unable to change password');
   });
+
+  it('blocks a replacement beyond bcrypt’s UTF-8 byte limit before sending it', async () => {
+    const wrapper = mount(BasicAuthChangePasswordModal, {
+      props: { modelValue: true },
+      global: {
+        components: {
+          UModal: UModalStub,
+          UFormField: UFormFieldStub,
+          UForm: UFormStub,
+          UInput: UInputStub,
+          UButton: UButtonStub,
+          USeparator: defineComponent({ template: '<hr />' }),
+          UIcon: defineComponent({ template: '<span />' })
+        }
+      }
+    });
+    const inputs = wrapper.findAll('input').slice(-3);
+    await inputs[0]?.setValue('old-password-123');
+    await inputs[1]?.setValue('é'.repeat(36) + 'x');
+    await inputs[2]?.setValue('é'.repeat(36) + 'x');
+    await wrapper.find('form').trigger('submit');
+
+    expect(wrapper.text()).toContain('72 UTF-8 bytes');
+    expect($fetch).not.toHaveBeenCalled();
+  });
 });

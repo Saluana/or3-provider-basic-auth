@@ -46,7 +46,7 @@
           <UFormField
             label="Password"
             name="password"
-            hint="At least 8 characters"
+            hint="At least 8 characters; at most 72 UTF-8 bytes"
           >
             <UInput
               v-model="state.password"
@@ -112,6 +112,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
+import { newPasswordFitsBcrypt } from '../password-policy';
 
 const modalUi = {
   overlay: 'basic-auth-modal-overlay',
@@ -160,6 +161,9 @@ function validateClientSide(): string | null {
   if (state.password.length > 512) {
     return 'Password is too long.';
   }
+  if (!newPasswordFitsBcrypt(state.password)) {
+    return 'Password must be 72 UTF-8 bytes or fewer.';
+  }
   if (state.password !== state.confirmPassword) {
     return 'Passwords must match.';
   }
@@ -206,7 +210,7 @@ async function onSubmit(): Promise<void> {
 
     if (statusCode === 400) {
       errorMessage.value =
-        serverMessage || 'Please check your email and password (min 8 characters).';
+        serverMessage || 'Please check your email and password (8 characters minimum; 72 UTF-8 bytes maximum).';
     } else if (statusCode === 403) {
       errorMessage.value =
         serverMessage || 'Registration is restricted for this instance.';

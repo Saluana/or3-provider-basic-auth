@@ -271,6 +271,22 @@ describe('basic-auth endpoint flow', () => {
     expect(payload.session?.user?.email).toBe('new-user@example.com');
   });
 
+  it('rejects passwords beyond 72 UTF-8 bytes before creating an account', async () => {
+    const password = 'é'.repeat(36) + 'x';
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl },
+      body: JSON.stringify({
+        email: 'over-limit@example.com',
+        password,
+        confirmPassword: password
+      })
+    });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('72 UTF-8 bytes');
+    expect(findAccountByEmail('over-limit@example.com')).toBeNull();
+  });
+
   it.each([
     {
       label: 'garbage',
@@ -515,5 +531,34 @@ describe('basic-auth endpoint flow', () => {
 
     const payload = await sessionAfterChange.json();
     expect(payload.session).toBeNull();
+  });
+
+  it('rejects an over-limit replacement without revoking the current session', async () => {
+    const jar: CookieJar = new Map();
+    const signIn = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl },
+      body: JSON.stringify({ email: 'user@example.com', password: 'password-1234' })
+    });
+    expect(signIn.status).toBe(200);
+    applySetCookies(jar, getSetCookies(signIn));
+    const response = await fetch(`${baseUrl}/api/basic-auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json', origin: baseUrl,
+        cookie: toCookieHeader(jar)
+      },
+      body: JSON.stringify({
+        currentPassword: 'password-1234',
+        newPassword: 'a'.repeat(73),
+        confirmNewPassword: 'a'.repeat(73)
+      })
+    });
+    expect(response.status).toBe(400);
+    expect(await response.text()).toContain('72 UTF-8 bytes');
+    const session = await fetch(`${baseUrl}/api/auth/session`, {
+      headers: { cookie: toCookieHeader(jar) }
+    });
+    expect((await session.json()).session?.user?.email).toBe('user@example.com');
   });
 });
