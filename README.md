@@ -148,3 +148,9 @@ prints its selected path; restart it after provider edits. Missing repositories
 or failed builds fall back to installed packages with a warning.
 `OR3_LOCAL_PROVIDERS=false` disables local selection. Production builds use the
 installed package, so local development does not publish these changes.
+
+Basic Auth's database always uses `better-sqlite3`, independently of the sync
+provider's SQLite driver. If the source launcher selects Bun for sync, this
+native binding must also work under the project-pinned Bun version. The launcher
+checks it in that runtime before starting Nuxt and reports incompatible bindings
+or runtime crashes. Managed Cloud uses Node with `better-sqlite3`.
