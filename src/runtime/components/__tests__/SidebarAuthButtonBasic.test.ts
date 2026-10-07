@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flushPromises, shallowMount } from '@vue/test-utils';
 import SidebarAuthButtonBasic from '../SidebarAuthButtonBasic.client.vue';
 import BasicAuthUserMenu from '../BasicAuthUserMenu.client.vue';
+import BasicAuthRegisterModal from '../BasicAuthRegisterModal.client.vue';
+import { resetInviteLinkForTests } from '../../lib/invite-link.client';
 
 const UButtonStub = defineComponent({
   template: '<button type="button"><slot /></button>'
@@ -101,6 +103,38 @@ describe('SidebarAuthButtonBasic', () => {
     expect(wrapper.getComponent(BasicAuthUserMenu).props('layout')).toBe(
       'more-sheet'
     );
+  });
+
+  describe('invite links', () => {
+    const mountButton = (layout?: 'rail' | 'more-sheet') => shallowMount(SidebarAuthButtonBasic, {
+      props: layout ? { layout } : {},
+      global: { stubs: { UButton: UButtonStub, UIcon: true, BasicAuthSignInModal: true,
+        BasicAuthChangePasswordModal: true, BasicAuthUserMenu: true } }
+    });
+    beforeEach(() => {
+      resetInviteLinkForTests();
+      window.history.replaceState(null, '', '/?invite=invite-token');
+    });
+
+    it('opens registration with the token filled in for a signed-out visitor, once per link', async () => {
+      vi.stubGlobal('$fetch', vi.fn(async () => ({ session: null })));
+      const rail = mountButton();
+      const sheet = mountButton('more-sheet');
+      await flushPromises();
+      const modals = [rail, sheet].map((wrapper) => wrapper.getComponent(BasicAuthRegisterModal));
+      expect(modals.map((modal) => modal.props('modelValue'))).toEqual([true, false]);
+      expect(modals.map((modal) => modal.props('inviteToken'))).toEqual(['invite-token', 'invite-token']);
+      expect(window.location.search).toBe('');
+    });
+
+    it('leaves a signed-in user where they are', async () => {
+      vi.stubGlobal('$fetch', vi.fn(async () => ({
+        session: { authenticated: true, provider: 'basic-auth', user: { email: 'user@example.com' } }
+      })));
+      const wrapper = mountButton();
+      await flushPromises();
+      expect(wrapper.findComponent(BasicAuthRegisterModal).props('modelValue')).toBe(false);
+    });
   });
 
   it('silently refreshes tokens when session endpoint returns null', async () => {

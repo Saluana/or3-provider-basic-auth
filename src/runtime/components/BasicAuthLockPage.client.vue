@@ -23,20 +23,30 @@
 
     <BasicAuthRegisterModal
       v-model="registerModalOpen"
+      :invite-token="inviteToken"
       @registered="handleRegistered"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue';
+import { nextTick, onMounted, ref } from 'vue';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
+import { claimInviteLinkAutoOpen, readInviteLinkToken } from '../lib/invite-link.client';
 
 const loginIcon = 'i-lucide-log-in';
 
 const signInModalOpen = ref(false);
 const registerModalOpen = ref(false);
+const inviteToken = ref<string | null>(null);
+
+// The lock page only shows signed-out visitors; an invite link opens
+// registration with its token filled in.
+onMounted(() => {
+  inviteToken.value = readInviteLinkToken();
+  if (claimInviteLinkAutoOpen()) registerModalOpen.value = true;
+});
 
 function notifyAuthSessionChanged(): void {
   if (typeof window === 'undefined') return;

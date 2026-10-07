@@ -69,6 +69,7 @@ Strict-mode behavior:
 - Canonical OR3 users/workspaces are still resolved by the selected `AuthWorkspaceStore`.
 - In `invite_only` mode, signed-token, expiry, persisted invite state/token hash, and normalized-email validation runs before Basic Auth creates an account or session.
 - The selected `AuthWorkspaceStore` must support atomic invite provisioning; internal user/auth mapping, membership, and invite consumption are committed together by that provider.
+- Invite links (`/?invite=TOKEN`, copied from Admin → Workspaces, or carried in the lock page's `next`) open registration for signed-out visitors with the token filled in. The token is removed from the address bar on first read and kept in memory for that page; only one mounted auth control (sidebar, mobile More sheet or lock page) opens registration per link. On mobile the account control lives in More, so registration opens when the visitor opens More.
 - Basic Auth account and initial refresh-session rows are created in one local SQLite transaction.
 - Access JWTs are short-lived and validated by `basicAuthProvider.getSession(event)`.
 - Refresh tokens are rotated and hashed at rest; replay attempts revoke active sessions.

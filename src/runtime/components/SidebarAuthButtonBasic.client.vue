@@ -57,6 +57,7 @@
 
     <BasicAuthRegisterModal
       v-model="registerModalOpen"
+      :invite-token="inviteToken"
       @registered="onRegistered"
     />
 
@@ -77,6 +78,7 @@ import {
   type AuthUiLayout,
 } from '../lib/auth-ui-layout';
 import { silentRefreshOnce } from '../lib/silent-refresh.client';
+import { claimInviteLinkAutoOpen, readInviteLinkToken } from '../lib/invite-link.client';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthUserMenu from './BasicAuthUserMenu.client.vue';
@@ -212,8 +214,15 @@ async function onRegistered(): Promise<void> {
   notifyAuthSessionChanged();
 }
 
-onMounted(() => {
-  void refreshSession();
+const inviteToken = ref<string | null>(null);
+
+onMounted(async () => {
+  inviteToken.value = readInviteLinkToken();
+  await refreshSession();
+  // An invite link is for creating an account: open registration directly.
+  if (!isSignedIn.value && isBasicAuthProvider.value && claimInviteLinkAutoOpen()) {
+    registerModalOpen.value = true;
+  }
 });
 </script>
 
