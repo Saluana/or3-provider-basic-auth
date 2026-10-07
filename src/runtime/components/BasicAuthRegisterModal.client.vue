@@ -73,7 +73,10 @@
             />
           </UFormField>
 
-          <UFormField label="Invite token (optional)" name="inviteToken">
+          <UFormField
+            :label="props.inviteToken ? 'Invite token (from your invite link)' : 'Invite token (optional)'"
+            name="inviteToken"
+          >
             <UInput
               v-model="state.inviteToken"
               type="text"
@@ -111,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { newPasswordFitsBcrypt } from '../password-policy';
 
 const modalUi = {
@@ -121,6 +124,8 @@ const modalUi = {
 
 const props = defineProps<{
   modelValue: boolean;
+  /** Token from an invite link; filled in when the form opens. */
+  inviteToken?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -144,6 +149,11 @@ const isOpen = computed({
     emit('update:modelValue', value);
   }
 });
+
+// Fill in a link's token when the form opens without replacing one the user typed.
+watch(() => [props.modelValue, props.inviteToken] as const, ([open, token]) => {
+  if (open && token && !state.inviteToken.trim()) state.inviteToken = token;
+}, { immediate: true });
 
 function close(): void {
   errorMessage.value = '';
