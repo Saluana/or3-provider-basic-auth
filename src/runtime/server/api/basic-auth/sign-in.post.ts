@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { defineEventHandler, type H3Event } from 'h3';
+import { defineEventHandler, setCookie, type H3Event } from 'h3';
+import { useRuntimeConfig } from '#imports';
+import { verifyInviteToken } from '~~/server/auth/invite-token';
 import { z } from 'zod';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
@@ -22,7 +24,8 @@ import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
 const signInSchema = z.object({
   email: z.string().email().max(320),
   // Sign-in must allow legacy short passwords; strength is enforced at set/change time.
-  password: z.string().min(1).max(512)
+  password: z.string().min(1).max(512),
+  inviteToken: z.string().trim().min(1).max(4096).optional()
 });
 
 const DUMMY_PASSWORD_HASH =
@@ -80,6 +83,19 @@ export async function handleSignIn(event: H3Event) {
 
   setAccessCookie(event, accessToken, config.accessTtlSeconds);
   setRefreshCookie(event, refreshToken, config.refreshTtlSeconds);
+
+  // Retain a replacement invitation after verifying the same credential identity.
+  // The canonical store still checks revocation and atomically grants access.
+  const secret = (useRuntimeConfig() as { auth?: { invite?: { tokenSecret?: string } } }).auth?.invite?.tokenSecret;
+  if (input.inviteToken && secret) {
+    const verified = verifyInviteToken(input.inviteToken, secret);
+    if (verified.ok && normalizeEmail(verified.payload.email) === email) {
+      setCookie(event, 'or3_invite_token', input.inviteToken, {
+        httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
+        path: '/', maxAge: Math.min(600, verified.payload.exp - Math.floor(Date.now() / 1000)),
+      });
+    }
+  }
 
   return { ok: true };
 }

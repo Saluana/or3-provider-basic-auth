@@ -21,7 +21,12 @@ type CookieJar = Map<string, string>;
 let registrationMode: 'open' | 'invite_only' = 'open';
 const inviteStore = vi.hoisted(() => ({
   validateInvite: vi.fn(),
-  acceptInviteAndProvisionUser: vi.fn()
+  acceptInviteAndProvisionUser: vi.fn(),
+  createSignupInvite: vi.fn(),
+  listSignupInvites: vi.fn(),
+  revokeSignupInvite: vi.fn(),
+  validateSignupInvite: vi.fn(),
+  acceptSignupInviteAndProvisionUser: vi.fn()
 }));
 const coreRuntimeConfig = vi.hoisted(() => ({
   auth: {
@@ -46,7 +51,7 @@ vi.mock('~~/server/auth/store/registry', () => ({
 }));
 
 function createInviteToken(
-  payload: { workspaceId: string; email: string; exp: number },
+  payload: { email: string; exp: number } & ({ workspaceId: string } | { purpose: 'signup'; invite_id: string }),
   secret: string
 ): string {
   const encoded = Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -158,6 +163,7 @@ describe('basic-auth endpoint flow', () => {
     process.env.OR3_BASIC_AUTH_ROTATION_GRACE_MS = '50';
 
     setRegistrationMode('open');
+    inviteStore.validateSignupInvite.mockReset().mockResolvedValue({ ok: true });
     inviteStore.validateInvite.mockReset().mockResolvedValue({
       ok: true,
       role: 'viewer'
@@ -438,6 +444,67 @@ describe('basic-auth endpoint flow', () => {
     expect(findAccountByEmail('invited@example.com')).not.toBeNull();
     expect(getSetCookies(response).join(';')).toContain('or3_access=');
     expect(getSetCookies(response).join(';')).toContain('or3_refresh=');
+  });
+
+  // Registration must reject the same effective invite as canonical session
+  // resolution, before committing credentials or issuing session cookies.
+  it.each(['cookie', 'header', 'query', 'referer'] as const)(
+    'rejects a revoked signup invite from the %s in open mode without preclaiming the email',
+    async (source) => {
+      const email = 'revoked@example.test';
+      const token = createInviteToken({ purpose: 'signup', invite_id: 'revoked', email, exp: Math.floor(Date.now() / 1000) + 3600 }, 'invite-secret');
+      inviteStore.validateSignupInvite.mockResolvedValue({ ok: false, reason: 'revoked' });
+      const headers: Record<string, string> = { 'content-type': 'application/json', origin: baseUrl };
+      if (source === 'cookie') headers.cookie = `or3_invite_token=${token}`;
+      if (source === 'header') headers['x-or3-invite-token'] = token;
+      if (source === 'referer') headers.referer = `${baseUrl}/?invite=${token}`;
+      const response = await fetch(`${baseUrl}/api/basic-auth/register${source === 'query' ? `?invite=${token}` : ''}`, {
+        method: 'POST', headers,
+        body: JSON.stringify({ email, password: 'password-1234', confirmPassword: 'password-1234' }),
+      });
+      expect(response.status).toBe(403);
+      expect(findAccountByEmail(email)).toBeNull();
+      expect(getSetCookies(response).join(';')).not.toMatch(/or3_(access|refresh)=/);
+    }
+  );
+
+  it('rejects a cookie invite for another email before creating open-mode credentials', async () => {
+    const token = createInviteToken({ purpose: 'signup', invite_id: 'wrong-email', email: 'intended@example.test', exp: Math.floor(Date.now() / 1000) + 3600 }, 'invite-secret');
+    const email = 'other@example.test';
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl, cookie: `or3_invite_token=${token}` },
+      body: JSON.stringify({ email, password: 'password-1234', confirmPassword: 'password-1234' }),
+    });
+    expect(response.status).toBe(403);
+    expect(findAccountByEmail(email)).toBeNull();
+    expect(getSetCookies(response).join(';')).not.toMatch(/or3_(access|refresh)=/);
+  });
+
+  it.each(['open', 'invite_only'] as const)('carries a valid header invite into the session cookie in %s mode', async (mode) => {
+    setRegistrationMode(mode);
+    const email = 'header-invite@example.test';
+    const token = createInviteToken({ purpose: 'signup', invite_id: 'header', email, exp: Math.floor(Date.now() / 1000) + 3600 }, 'invite-secret');
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl, 'x-or3-invite-token': token },
+      body: JSON.stringify({ email, password: 'password-1234', confirmPassword: 'password-1234' }),
+    });
+    expect(response.status).toBe(200);
+    expect(findAccountByEmail(email)).not.toBeNull();
+    expect(getSetCookies(response).join(';')).toContain(`or3_invite_token=${token}`);
+  });
+
+  it('lets an explicit valid token replace a stale invite cookie', async () => {
+    const email = 'replacement@example.test';
+    const token = createInviteToken({ purpose: 'signup', invite_id: 'replacement', email, exp: Math.floor(Date.now() / 1000) + 3600 }, 'invite-secret');
+    const response = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl, cookie: 'or3_invite_token=stale' },
+      body: JSON.stringify({ email, password: 'password-1234', confirmPassword: 'password-1234', inviteToken: token }),
+    });
+    expect(response.status).toBe(200);
+    expect(getSetCookies(response).join(';')).toContain(`or3_invite_token=${token}`);
   });
 
   it('refresh rotates sessions; concurrent refresh within grace reuses; later replay is rejected', async () => {

@@ -155,3 +155,11 @@ provider's SQLite driver. If the source launcher selects Bun for sync, this
 native binding must also work under the project-pinned Bun version. The launcher
 checks it in that runtime before starting Nuxt and reports incompatible bindings
 or runtime crashes. Managed Cloud uses Node with `better-sqlite3`.
+
+## Instance signup invitations
+
+The updated host distinguishes signup invites from existing team invites. Signup invites create a private workspace with only the recipient as owner; team invites retain their selected workspace and role. This requires the updated host and rebuilt provider artifacts, rather than the existing published release alone.
+
+Registration preflight rejects invalid invites before credential creation, including in open mode. It resolves the explicit body token first, followed by the host's header, HttpOnly cookie, query, and Referer precedence. A valid token is retained in the invite cookie for canonical session resolution; an explicit replacement overrides a stale cookie. Without a token, open registration remains available. If credentials commit before canonical acceptance, use Already registered? Sign in with the same account and a valid or replacement invite. The sign-in request preserves manually pasted tokens, verifies the signed-in email, and uses the existing HttpOnly invite cookie. The selected sync store still owns atomic acceptance; provider-only credentials grant no protected OR3 access. No credential lifecycle or recovery service is added.
+
+Provider-only tests use the exact host registration and token sources pinned in `tests/fixtures/host`, with SHA-256 provenance verified by Vitest. No sibling checkout is required. To exercise the current host integration, run `OR3_CANONICAL_HOST_ROOT=/absolute/path/to/or3-chat bun run test`. Refresh the pinned files and provenance together when adopting a reviewed host contract change; do not replace the host validation logic with a provider-local implementation.

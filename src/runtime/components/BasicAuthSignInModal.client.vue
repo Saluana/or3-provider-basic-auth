@@ -92,6 +92,7 @@ const modalUi = {
 
 const props = defineProps<{
   modelValue: boolean;
+  inviteToken?: string;
 }>();
 
 const emit = defineEmits<{
@@ -128,7 +129,8 @@ async function onSubmit(): Promise<void> {
       method: 'POST',
       body: {
         email: state.email,
-        password: state.password
+        password: state.password,
+        inviteToken: props.inviteToken?.trim() || undefined
       }
     });
 

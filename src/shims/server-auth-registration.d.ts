@@ -32,6 +32,7 @@ declare module '~~/server/auth/registration' {
       };
 
   export function resolveRegistrationMode(config: ReturnType<typeof useRuntimeConfig>): RegistrationMode;
+  export function getInviteTokenFromEvent(event: H3Event): string | null;
   export function evaluateUnknownUserRegistration(input: {
     event: H3Event;
     store: AuthWorkspaceStore;

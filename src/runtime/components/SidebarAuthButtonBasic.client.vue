@@ -51,6 +51,7 @@
 
     <BasicAuthSignInModal
       v-model="signInModalOpen"
+      :invite-token="inviteToken"
       @signed-in="onSignedIn"
       @open-register="openRegisterFromSignIn"
     />
@@ -58,6 +59,7 @@
     <BasicAuthRegisterModal
       v-model="registerModalOpen"
       :invite-token="inviteToken"
+      @open-sign-in="openSignInFromRegister"
       @registered="onRegistered"
     />
 
@@ -224,6 +226,12 @@ onMounted(async () => {
     registerModalOpen.value = true;
   }
 });
+async function openSignInFromRegister(token: string): Promise<void> {
+  inviteToken.value = token || inviteToken.value;
+  registerModalOpen.value = false;
+  await nextTick();
+  signInModalOpen.value = true;
+}
 </script>
 
 <!-- Basic-auth dialogs are teleported to <body>, outside the host sidebar. -->

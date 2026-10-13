@@ -4,6 +4,7 @@ import { createError, defineEventHandler, setCookie, type H3Event } from 'h3';
 import { z } from 'zod';
 import { getAuthWorkspaceStore } from '~~/server/auth/store/registry';
 import {
+  getInviteTokenFromEvent,
   resolveRegistrationMode,
   validateInviteRegistration,
   type RegistrationDecision
@@ -80,11 +81,12 @@ export async function handleRegister(event: H3Event) {
     mapRegistrationErrorToHttp('disabled');
   }
 
-  if (mode === 'invite_only' && !body.inviteToken?.trim()) {
+  const inviteToken = body.inviteToken ?? getInviteTokenFromEvent(event);
+  if (mode === 'invite_only' && !inviteToken) {
     mapRegistrationErrorToHttp('invite_required');
   }
 
-  if (mode === 'invite_only') {
+  if (inviteToken) {
     const syncConfig = runtimeConfig as {
       sync?: { provider?: string };
       public?: { sync?: { provider?: string } };
@@ -102,7 +104,7 @@ export async function handleRegister(event: H3Event) {
       store,
       mode,
       email,
-      inviteToken: body.inviteToken
+      inviteToken
     });
     if (!decision.allowed) {
       mapRegistrationErrorToHttp(decision.reason);
@@ -156,8 +158,8 @@ export async function handleRegister(event: H3Event) {
   setAccessCookie(event, accessToken, config.accessTtlSeconds);
   setRefreshCookie(event, refreshToken, config.refreshTtlSeconds);
 
-  if (mode === 'invite_only' && body.inviteToken?.trim()) {
-    setCookie(event, 'or3_invite_token', body.inviteToken.trim(), {
+  if (inviteToken) {
+    setCookie(event, 'or3_invite_token', inviteToken, {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

@@ -17,6 +17,7 @@
 
     <BasicAuthSignInModal
       v-model="signInModalOpen"
+      :invite-token="inviteToken"
       @signed-in="handleSignedIn"
       @open-register="openRegisterFromSignIn"
     />
@@ -24,6 +25,7 @@
     <BasicAuthRegisterModal
       v-model="registerModalOpen"
       :invite-token="inviteToken"
+      @open-sign-in="openSignInFromRegister"
       @registered="handleRegistered"
     />
   </div>
@@ -67,5 +69,11 @@ async function openRegisterFromSignIn(): Promise<void> {
   setTimeout(() => {
     registerModalOpen.value = true;
   }, 0);
+}
+async function openSignInFromRegister(token: string): Promise<void> {
+  inviteToken.value = token || inviteToken.value;
+  registerModalOpen.value = false;
+  await nextTick();
+  signInModalOpen.value = true;
 }
 </script>

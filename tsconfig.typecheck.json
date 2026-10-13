@@ -9,6 +9,7 @@
       "~~/server/auth/token-broker/registry": ["./src/shims/server-auth-token-broker-registry.d.ts"],
       "~~/server/auth/store/registry": ["./src/shims/server-auth-store-registry.d.ts"],
       "~~/server/auth/store/types": ["./src/shims/server-auth-store-types.d.ts"],
+      "~~/server/auth/invite-token": ["./src/shims/server-auth-invite-token.d.ts"],
       "~~/server/auth/registration": ["./src/shims/server-auth-registration.d.ts"],
       "~~/server/admin/providers/types": ["./src/shims/server-admin-providers-types.d.ts"],
       "~~/server/admin/providers/registry": ["./src/shims/server-admin-providers-registry.d.ts"],

@@ -93,6 +93,7 @@
             {{ errorMessage }}
           </div>
 
+          <UButton type="button" color="neutral" variant="ghost" :disabled="pending" @click="emit('open-sign-in', state.inviteToken)">Already registered? Sign in</UButton>
           <div class="flex justify-end gap-2 pt-1">
             <UButton
               color="neutral"
@@ -131,6 +132,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void;
   (event: 'registered'): void;
+  (event: 'open-sign-in', inviteToken: string): void;
 }>();
 
 const state = reactive({
@@ -225,7 +227,7 @@ async function onSubmit(): Promise<void> {
       errorMessage.value =
         serverMessage || 'Registration is restricted for this instance.';
     } else if (statusCode === 401) {
-      errorMessage.value = 'Email is already in use.';
+      errorMessage.value = 'Unable to register. If you already registered, sign in to continue.';
     } else if (statusCode === 409) {
       errorMessage.value = 'Email is already in use.';
     } else {

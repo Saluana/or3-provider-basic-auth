@@ -1,0 +1,15 @@
+{
+  "source": "or3-chat",
+  "base_commit": "59af403f33e5a0bf9065ad8df953c96689fc041d",
+  "source_state": "Reviewed uncommitted signup-invite changes",
+  "files": [
+    {
+      "path": "server/auth/registration.ts",
+      "sha256": "fd035f6a76e0f984cdb8c2d9929ce7061925c6dbe6b6dc593f1629632c48a4bf"
+    },
+    {
+      "path": "server/auth/invite-token.ts",
+      "sha256": "2e5beeb13c0a001767b8ad776339573eabaf9bbddfe94d1d80b3da0905a9d545"
+    }
+  ]
+}

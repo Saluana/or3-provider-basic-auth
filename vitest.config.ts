@@ -1,15 +1,28 @@
 import { defineConfig } from 'vitest/config';
 import path from 'path';
 import vue from '@vitejs/plugin-vue';
+import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import provenance from './tests/fixtures/host/provenance.json';
+
+const fixtureRoot = path.resolve(__dirname, 'tests/fixtures/host');
+for (const file of provenance.files) {
+  const bytes = readFileSync(path.join(fixtureRoot, file.path));
+  if (createHash('sha256').update(bytes).digest('hex') !== file.sha256) {
+    throw new Error(`Pinned host fixture drift: ${file.path}`);
+  }
+}
+const hostRoot = process.env.OR3_CANONICAL_HOST_ROOT || fixtureRoot;
 
 export default defineConfig({
   plugins: [vue()],
   resolve: {
     alias: {
       '#imports': path.resolve(__dirname, 'src/test-shims/nuxt-imports.ts'),
+      '~~/server/auth/invite-token': path.resolve(hostRoot, 'server/auth/invite-token.ts'),
       '~~/server/auth/registration': path.resolve(
-        __dirname,
-        'src/test-shims/server-auth-registration.ts'
+        hostRoot,
+        'server/auth/registration.ts'
       ),
       '~~/server/auth/registry': path.resolve(
         __dirname,
