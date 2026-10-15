@@ -19,6 +19,12 @@ export default defineConfig({
   resolve: {
     alias: {
       '#imports': path.resolve(__dirname, 'src/test-shims/nuxt-imports.ts'),
+      '~/composables/auth/useClientAuthStatus.client': path.resolve(
+        __dirname, 'src/test-shims/client-auth-registries.ts'
+      ),
+      '~/composables/auth/useClientSessionRecovery': path.resolve(
+        __dirname, 'src/test-shims/client-auth-registries.ts'
+      ),
       '~~/server/auth/invite-token': path.resolve(hostRoot, 'server/auth/invite-token.ts'),
       '~~/server/auth/registration': path.resolve(
         hostRoot,

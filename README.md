@@ -8,6 +8,7 @@ This package registers:
 - `ProviderTokenBroker` (`basic-auth`)
 - admin status adapter (`auth-basic-auth`)
 - provider-owned auth UI adapter + components
+- Client status and silent-refresh recovery adapters activate only while SSR auth is enabled and Basic Auth is selected; inactive modules preserve the active auth provider's adapters.
 
 ## Installation
 
