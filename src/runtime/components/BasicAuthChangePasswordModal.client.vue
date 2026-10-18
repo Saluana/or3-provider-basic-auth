@@ -31,7 +31,7 @@
 
           <USeparator />
 
-          <UFormField label="New Password" name="newPassword" hint="At least 8 characters; at most 72 UTF-8 bytes">
+          <UFormField label="New Password" name="newPassword" hint="Use at least 8 characters">
             <UInput
               v-model="state.newPassword"
               type="password"
@@ -124,7 +124,7 @@ async function onSubmit(): Promise<void> {
     return;
   }
   if (!newPasswordFitsBcrypt(state.newPassword)) {
-    errorMessage.value = 'New password must be 72 UTF-8 bytes or fewer.';
+    errorMessage.value = 'Password is too long. Please shorten it.';
     return;
   }
   if (state.newPassword !== state.confirmNewPassword) {

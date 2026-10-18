@@ -289,7 +289,7 @@ describe('basic-auth endpoint flow', () => {
       })
     });
     expect(response.status).toBe(400);
-    expect(await response.text()).toContain('72 UTF-8 bytes');
+    expect(await response.text()).toContain('Password is too long. Please shorten it.');
     expect(findAccountByEmail('over-limit@example.com')).toBeNull();
   });
 
@@ -622,7 +622,7 @@ describe('basic-auth endpoint flow', () => {
       })
     });
     expect(response.status).toBe(400);
-    expect(await response.text()).toContain('72 UTF-8 bytes');
+    expect(await response.text()).toContain('Password is too long. Please shorten it.');
     const session = await fetch(`${baseUrl}/api/auth/session`, {
       headers: { cookie: toCookieHeader(jar) }
     });

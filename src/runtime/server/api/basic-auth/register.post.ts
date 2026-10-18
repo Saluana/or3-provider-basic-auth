@@ -32,10 +32,10 @@ const registerSchema = z
   .object({
     email: z.string().email().max(320),
     password: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
-      message: 'Password must be 72 UTF-8 bytes or fewer.'
+      message: 'Password is too long. Please shorten it.'
     }),
     confirmPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
-      message: 'Password must be 72 UTF-8 bytes or fewer.'
+      message: 'Password is too long. Please shorten it.'
     }),
     displayName: z.string().trim().min(1).max(120).optional(),
     inviteToken: z.string().trim().min(1).max(4096).optional()
@@ -59,9 +59,17 @@ function mapRegistrationErrorToHttp(
       statusMessage: 'Invite-only registration is temporarily unavailable.'
     });
   }
+  if (reason === 'invite_email_mismatch') {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'This invitation is for a different email address. Check for typos or use the email that received the invite.'
+    });
+  }
   throw createError({
     statusCode: 403,
-    statusMessage: 'A valid invite is required to register.'
+    statusMessage: reason === 'invite_required'
+      ? 'Enter an invite code to create an account.'
+      : 'This invite code is invalid or has expired. Check your invite link or ask for a new invitation.'
   });
 }
 

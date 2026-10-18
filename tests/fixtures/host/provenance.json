@@ -1,11 +1,11 @@
 {
   "source": "or3-chat",
-  "base_commit": "59af403f33e5a0bf9065ad8df953c96689fc041d",
-  "source_state": "Reviewed uncommitted signup-invite changes",
+  "base_commit": "6288a354252b90c2cdacb86b67411ad7c5bbdfea",
+  "source_state": "Reviewed uncommitted invitation email-mismatch classification",
   "files": [
     {
       "path": "server/auth/registration.ts",
-      "sha256": "fd035f6a76e0f984cdb8c2d9929ce7061925c6dbe6b6dc593f1629632c48a4bf"
+      "sha256": "a68d5633480a806d08adbff78a09520443b4a099db494237cae1d65e928ea805"
     },
     {
       "path": "server/auth/invite-token.ts",

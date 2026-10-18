@@ -142,7 +142,7 @@ describe('BasicAuthChangePasswordModal', () => {
     await inputs[2]?.setValue('é'.repeat(36) + 'x');
     await wrapper.find('form').trigger('submit');
 
-    expect(wrapper.text()).toContain('72 UTF-8 bytes');
+    expect(wrapper.text()).toContain('Password is too long. Please shorten it.');
     expect($fetch).not.toHaveBeenCalled();
   });
 });

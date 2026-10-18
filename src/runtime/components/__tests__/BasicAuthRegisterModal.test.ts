@@ -37,7 +37,7 @@ describe('BasicAuthRegisterModal', () => {
     });
     await wrapper.setProps({ modelValue: true });
     const field = wrapper.get('[data-name="inviteToken"]');
-    expect(field.text()).toBe('Invite token (from your invite link)');
+    expect(field.text()).toBe('Invite code (from your invite link)');
     expect((field.get('input').element as HTMLInputElement).value).toBe('link-token');
 
     const inputs = wrapper.findAll('input:not([readonly])');
@@ -54,7 +54,7 @@ describe('BasicAuthRegisterModal', () => {
   it('keeps the optional field empty without an invite link', async () => {
     const wrapper = mount(BasicAuthRegisterModal, { props: { modelValue: true }, global: { components } });
     const field = wrapper.get('[data-name="inviteToken"]');
-    expect(field.text()).toBe('Invite token (optional)');
+    expect(field.text()).toBe('Invite code (optional)');
     expect((field.get('input').element as HTMLInputElement).value).toBe('');
   });
 });

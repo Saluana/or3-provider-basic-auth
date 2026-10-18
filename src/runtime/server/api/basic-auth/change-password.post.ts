@@ -18,10 +18,10 @@ const changePasswordSchema = z
     // Existing accounts may have legacy short passwords; only new password is length-enforced.
     currentPassword: z.string().min(1).max(512),
     newPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
-      message: 'Password must be 72 UTF-8 bytes or fewer.'
+      message: 'Password is too long. Please shorten it.'
     }),
     confirmNewPassword: z.string().min(8).max(512).refine(newPasswordFitsBcrypt, {
-      message: 'Password must be 72 UTF-8 bytes or fewer.'
+      message: 'Password is too long. Please shorten it.'
     })
   })
   .refine((input) => input.newPassword === input.confirmNewPassword, {
