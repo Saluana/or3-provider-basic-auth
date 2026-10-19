@@ -56,12 +56,14 @@
 
 <script setup lang="ts">
 import { nextTick, onMounted, reactive, ref } from 'vue';
-import { useRuntimeConfig } from '#imports';
+import { useRuntimeConfig, useToast } from '#imports';
+import { PASSWORD_UPDATED_NOTICE_KEY } from '../lib/constants';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
 import { claimInviteLinkAutoOpen, readInviteLinkToken } from '../lib/invite-link.client';
 
 const runtimeConfig = useRuntimeConfig();
+const toast = useToast();
 const state = reactive({ email: '' });
 const signInModalOpen = ref(false);
 const registerModalOpen = ref(false);
@@ -72,7 +74,23 @@ const inviteToken = ref<string | null>(null);
 onMounted(() => {
   inviteToken.value = readInviteLinkToken();
   if (claimInviteLinkAutoOpen()) registerModalOpen.value = true;
+  showPasswordUpdatedNotice();
 });
+
+// Changing a password signs the user out everywhere; say so once they land here.
+function showPasswordUpdatedNotice(): void {
+  try {
+    if (!sessionStorage.getItem(PASSWORD_UPDATED_NOTICE_KEY)) return;
+    sessionStorage.removeItem(PASSWORD_UPDATED_NOTICE_KEY);
+  } catch {
+    return;
+  }
+  toast.add({
+    title: 'Password updated',
+    description: 'You were signed out on all devices. Sign in with your new password.',
+    color: 'success',
+  });
+}
 
 function continueWithEmail(): void {
   state.email = state.email.trim();

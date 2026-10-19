@@ -326,3 +326,11 @@ Provider-only tests use the exact host registration and token sources pinned in 
 New signup invitations use eight random characters (shown as `K7MP-4X9Q`) and retain clickable invite links. Lowercase, spaces, and an optional dash are accepted. The host hashes codes with HMAC using `OR3_AUTH_INVITE_TOKEN_SECRET`, shares a 20/minute/IP lookup limit across invitation entry points, and preserves email binding, expiry, revocation, and atomic single use. Previously issued signed links remain supported. Codes and hashes are omitted from invitation history.
 
 The updated host and SQLite or Convex store must provide short-code resolution. Registration and replacement-code sign-in call the host preflight; backend acceptance remains the source of workspace access.
+
+### Session and account feedback
+
+The sidebar reads the host's shared session and emits `or3:auth-session-changed` after sign-in, registration, sign-out, or a password change. The host owns refreshing the session and deciding whether account changes require a reload. Session probes disable automatic request retries.
+
+Invite-only registration marks the code as required before submission. Invalid or expired invitation messages explain the next step for the current registration mode. Sign-out also clears the pending invitation cookie so it cannot apply to another signup. Password changes explain that all sessions are revoked, report incorrect-password and rate-limit errors, and show a one-time confirmation on the sign-in screen.
+
+These source changes require a new provider package release and a coordinated host dependency pin. The existing `0.0.13` package does not include them.

@@ -91,7 +91,7 @@
           </UFormField>
 
           <UFormField
-            :label="props.inviteToken ? 'Invite code (from your invite link)' : 'Invite code (optional)'"
+            :label="inviteLabel"
             name="inviteToken"
           >
             <UInput
@@ -166,6 +166,7 @@ const modalUi = {
 };
 
 const runtimeConfig = useRuntimeConfig();
+const inviteRequired = computed(() => runtimeConfig.public?.registrationMode === 'invite_only');
 const logoUrl = computed(() => runtimeConfig.public?.branding?.logoUrl || '/logos/logo-svg.svg');
 
 const props = defineProps<{
@@ -174,6 +175,11 @@ const props = defineProps<{
   inviteToken?: string | null;
   initialEmail?: string;
 }>();
+
+const inviteLabel = computed(() => {
+  if (props.inviteToken) return 'Invite code (from your invite link)';
+  return inviteRequired.value ? 'Invite code (required)' : 'Invite code (optional)';
+});
 
 const emit = defineEmits<{
   (event: 'update:modelValue', value: boolean): void;
@@ -228,6 +234,9 @@ function validateClientSide(): string | null {
   }
   if (state.password !== state.confirmPassword) {
     return 'Passwords must match.';
+  }
+  if (inviteRequired.value && !state.inviteToken.trim()) {
+    return 'Enter an invite code to create an account. Use the link or code from your invitation.';
   }
   return null;
 }

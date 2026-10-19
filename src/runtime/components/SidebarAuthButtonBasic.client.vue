@@ -74,12 +74,12 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, ref, unref } from 'vue';
 import { useRuntimeConfig } from '#imports';
+import { useSessionContext } from '~/composables/auth/useSessionContext';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 import {
   AUTH_UI_LAYOUT_KEY,
   type AuthUiLayout,
 } from '../lib/auth-ui-layout';
-import { silentRefreshOnce } from '../lib/silent-refresh.client';
 import { claimInviteLinkAutoOpen, readInviteLinkToken } from '../lib/invite-link.client';
 import BasicAuthSignInModal from './BasicAuthSignInModal.client.vue';
 import BasicAuthRegisterModal from './BasicAuthRegisterModal.client.vue';
@@ -106,47 +106,14 @@ type SessionData = {
   };
 };
 
-type SessionPayload = {
-  session: SessionData | null;
-};
-
-const session = ref<SessionData | null>(null);
-
-async function fetchSessionPayload(): Promise<SessionPayload> {
-  return await $fetch<SessionPayload>('/api/auth/session', {
-    cache: 'no-store',
-  });
-}
-
-async function refreshSession(
-  options: { allowSilentRefresh?: boolean } = {}
-): Promise<void> {
-  const allowSilentRefresh = options.allowSilentRefresh ?? true;
-
-  try {
-    const payload = await fetchSessionPayload();
-    session.value = payload.session ?? null;
-  } catch {
-    session.value = null;
-    return;
-  }
-
-  if (session.value || !allowSilentRefresh) {
-    return;
-  }
-
-  const didRefresh = await silentRefreshOnce();
-  if (!didRefresh) {
-    return;
-  }
-
-  try {
-    const payload = await fetchSessionPayload();
-    session.value = payload.session ?? null;
-  } catch {
-    session.value = null;
-  }
-}
+// The host keeps one shared session for the whole app. This component only
+// reads it. After an auth event it announces the change and lets the host
+// refresh: the host compares the session before and after its own refresh to
+// decide whether to reload, so refreshing it here first would hide the change.
+const sessionContext = useSessionContext();
+const session = computed<SessionData | null>(
+  () => (sessionContext.data.value?.session as SessionData | null | undefined) ?? null
+);
 
 const isBasicAuthProvider = computed(() => {
   const publicProvider = runtimeConfig.public?.authProvider;
@@ -188,18 +155,15 @@ function notifyAuthSessionChanged(): void {
   window.dispatchEvent(new CustomEvent('or3:auth-session-changed'));
 }
 
-async function onSignedIn(): Promise<void> {
-  await refreshSession({ allowSilentRefresh: false });
+function onSignedIn(): void {
   notifyAuthSessionChanged();
 }
 
-async function onSignedOut(): Promise<void> {
-  await refreshSession({ allowSilentRefresh: false });
+function onSignedOut(): void {
   notifyAuthSessionChanged();
 }
 
-async function onPasswordUpdated(): Promise<void> {
-  await refreshSession({ allowSilentRefresh: false });
+function onPasswordUpdated(): void {
   notifyAuthSessionChanged();
 }
 
@@ -211,16 +175,14 @@ async function openRegisterFromSignIn(): Promise<void> {
   }, 0);
 }
 
-async function onRegistered(): Promise<void> {
-  await refreshSession({ allowSilentRefresh: false });
+function onRegistered(): void {
   notifyAuthSessionChanged();
 }
 
 const inviteToken = ref<string | null>(null);
 
-onMounted(async () => {
+onMounted(() => {
   inviteToken.value = readInviteLinkToken();
-  await refreshSession();
   // An invite link is for creating an account: open registration directly.
   if (!isSignedIn.value && isBasicAuthProvider.value && claimInviteLinkAutoOpen()) {
     registerModalOpen.value = true;

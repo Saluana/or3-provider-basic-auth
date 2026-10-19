@@ -132,7 +132,7 @@ describe('basic-auth sign-out portable teardown', () => {
 
     const response = await fetch(`${baseUrl}/api/basic-auth/sign-out`, {
       method: 'POST',
-      headers: authCookies(session),
+      headers: { cookie: `${authCookies(session).cookie}; or3_invite_token=previous-signup` },
     });
 
     expect(response.status).toBe(200);
@@ -145,6 +145,9 @@ describe('basic-auth sign-out portable teardown', () => {
     const cleared = setAuthCookieValues(response);
     expect(cleared.length).toBeGreaterThan(0);
     expect(cleared.every((value) => value === '')).toBe(true);
+    expect(response.headers.getSetCookie()).toContainEqual(
+      expect.stringMatching(/^or3_invite_token=;.*Max-Age=0.*Path=\//)
+    );
   });
 
   it('still signs out when no session resolves', async () => {
