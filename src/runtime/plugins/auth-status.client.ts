@@ -13,7 +13,9 @@ type SessionPayload = {
 async function fetchSession(): Promise<SessionPayload | null> {
   try {
     return await $fetch<SessionPayload>('/api/auth/session', {
-      cache: 'no-store'
+      cache: 'no-store',
+      // ofetch would resend a failed GET at once, even after a 429.
+      retry: 0
     });
   } catch {
     return null;

@@ -7,7 +7,8 @@ import {
   getInviteTokenFromEvent,
   resolveRegistrationMode,
   validateInviteRegistration,
-  type RegistrationDecision
+  type RegistrationDecision,
+  type RegistrationMode
 } from '~~/server/auth/registration';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
@@ -45,7 +46,8 @@ const registerSchema = z
   });
 
 function mapRegistrationErrorToHttp(
-  reason: Extract<RegistrationDecision, { allowed: false }>['reason']
+  reason: Extract<RegistrationDecision, { allowed: false }>['reason'],
+  mode: RegistrationMode
 ): never {
   if (reason === 'disabled') {
     throw createError({
@@ -65,12 +67,19 @@ function mapRegistrationErrorToHttp(
       statusMessage: 'This invitation is for a different email address. Check for typos or use the email that received the invite.'
     });
   }
-  throw createError({
-    statusCode: 403,
-    statusMessage: reason === 'invite_required'
-      ? 'Enter an invite code to create an account.'
-      : 'This invite code is invalid or has expired. Check your invite link or ask for a new invitation.'
-  });
+  if (reason === 'invite_required') {
+    throw createError({ statusCode: 403, statusMessage: 'Enter an invite code to create an account.' });
+  }
+  // Open registration treats the code as optional, so clearing it is a way forward.
+  const nextStep = mode === 'open'
+    ? 'Clear the invite code to sign up without one, or ask for a new invitation.'
+    : reason === 'invite_expired'
+      ? 'Ask for a new invitation.'
+      : 'Check your invite link or ask for a new invitation.';
+  const invalidMessage = reason === 'invite_expired'
+    ? 'This invitation has expired.'
+    : 'This invite code isn\'t valid. It may be mistyped, already used, or cancelled.';
+  throw createError({ statusCode: 403, statusMessage: `${invalidMessage} ${nextStep}` });
 }
 
 export async function handleRegister(event: H3Event) {
@@ -86,12 +95,12 @@ export async function handleRegister(event: H3Event) {
   const mode = resolveRegistrationMode(runtimeConfig);
 
   if (mode === 'disabled') {
-    mapRegistrationErrorToHttp('disabled');
+    mapRegistrationErrorToHttp('disabled', mode);
   }
 
   const inviteToken = body.inviteToken ?? getInviteTokenFromEvent(event);
   if (mode === 'invite_only' && !inviteToken) {
-    mapRegistrationErrorToHttp('invite_required');
+    mapRegistrationErrorToHttp('invite_required', mode);
   }
 
   if (inviteToken) {
@@ -105,7 +114,7 @@ export async function handleRegister(event: H3Event) {
       'convex';
     const store = getAuthWorkspaceStore(storeId);
     if (!store) {
-      mapRegistrationErrorToHttp('invite_unsupported');
+      mapRegistrationErrorToHttp('invite_unsupported', mode);
     }
     const decision = await validateInviteRegistration({
       event,
@@ -115,7 +124,7 @@ export async function handleRegister(event: H3Event) {
       inviteToken
     });
     if (!decision.allowed) {
-      mapRegistrationErrorToHttp(decision.reason);
+      mapRegistrationErrorToHttp(decision.reason, mode);
     }
   }
 

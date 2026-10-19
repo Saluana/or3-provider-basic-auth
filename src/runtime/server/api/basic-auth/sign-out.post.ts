@@ -1,4 +1,4 @@
-import { defineEventHandler, type H3Event } from 'h3';
+import { defineEventHandler, deleteCookie, type H3Event } from 'h3';
 import { revokeHostActivationsForUser } from '~~/server/utils/plugins/isolation/activation-registry';
 import { clearAuthCookies } from '../../lib/cookies';
 import {
@@ -85,6 +85,9 @@ export async function handleSignOut(event: H3Event) {
   }
 
   clearAuthCookies(event);
+  // A finished signup leaves its invite here for the new session; once the
+  // user signs out it would wrongly apply to the next signup in this browser.
+  deleteCookie(event, 'or3_invite_token', { httpOnly: true, sameSite: 'lax', path: '/' });
   return { ok: true };
 }
 

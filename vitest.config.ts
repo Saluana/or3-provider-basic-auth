@@ -25,6 +25,9 @@ export default defineConfig({
       '~/composables/auth/useClientSessionRecovery': path.resolve(
         __dirname, 'src/test-shims/client-auth-registries.ts'
       ),
+      '~/composables/auth/useSessionContext': path.resolve(
+        __dirname, 'src/test-shims/session-context.ts'
+      ),
       '~~/server/auth/invite-token': path.resolve(hostRoot, 'server/auth/invite-token.ts'),
       '~~/server/auth/registration': path.resolve(
         hostRoot,
