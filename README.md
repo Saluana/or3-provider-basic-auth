@@ -2,6 +2,8 @@
 
 Basic-auth provider for OR3 Chat SSR mode.
 
+Requires **Node.js 24.22.1 or newer on the 24.x line**, matching OR3 Chat. Development and CI pin **24.22.1** in `.node-version`.
+
 This package registers:
 
 - `AuthProvider` (`basic-auth`)
