@@ -12,6 +12,12 @@ This package registers:
 
 ## Lock page UI
 
+The auth UI adapter registers `signInComponent` for direct host requests. It uses
+the existing sign-in/registration flow in `modalOnly` mode with Nuxt UI's `open`,
+`close`, and `after:leave` overlay lifecycle, so chat cards and blocked sends can
+open sign-in without first opening a sidebar or mobile menu. This requires the
+updated host and a rebuilt provider.
+
 The lock-page adapter uses an email-first form: **Continue with email** opens
 registration with the address filled in, and **Existing account? Sign in** opens
 the password sign-in dialog. When the host's public `registrationMode` is

@@ -1,7 +1,7 @@
 <template>
   <template v-if="isBasicAuthProvider">
     <BasicAuthUserMenu
-      v-if="isSignedIn"
+      v-if="!modalOnly && isSignedIn"
       :email="sessionUser?.email"
       :display-name="sessionUser?.displayName"
       :layout="resolvedLayout"
@@ -10,7 +10,7 @@
     />
 
     <button
-      v-else-if="isMoreSheetLayout"
+      v-else-if="!modalOnly && isMoreSheetLayout"
       type="button"
       class="more-row"
       aria-label="Login"
@@ -31,7 +31,7 @@
     </button>
 
     <UButton
-      v-else
+      v-else-if="!modalOnly"
       v-bind="loginButtonProps"
       type="button"
       aria-label="Login"
@@ -54,6 +54,8 @@
       :invite-token="inviteToken"
       @signed-in="onSignedIn"
       @open-register="openRegisterFromSignIn"
+      @update:model-value="onDialogOpenChanged"
+      @after:leave="onDialogAfterLeave"
     />
 
     <BasicAuthRegisterModal
@@ -61,6 +63,8 @@
       :invite-token="inviteToken"
       @open-sign-in="openSignInFromRegister"
       @registered="onRegistered"
+      @update:model-value="onDialogOpenChanged"
+      @after:leave="onDialogAfterLeave"
     />
 
     <BasicAuthChangePasswordModal
@@ -72,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, unref } from 'vue';
+import { computed, inject, nextTick, onMounted, ref, unref, watch } from 'vue';
 import { useRuntimeConfig } from '#imports';
 import { useSessionContext } from '~/composables/auth/useSessionContext';
 import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
@@ -89,12 +93,26 @@ import BasicAuthChangePasswordModal from './BasicAuthChangePasswordModal.client.
 const props = defineProps<{
   /** Explicit host layout — preferred over inject (cross-package inject can miss). */
   layout?: AuthUiLayout;
+  modalOnly?: boolean;
+  open?: boolean;
 }>();
+const emit = defineEmits<{ close: []; 'after:leave': [] }>();
 
 const runtimeConfig = useRuntimeConfig();
-const signInModalOpen = ref(false);
+const signInModalOpen = ref(props.modalOnly === true && props.open === true);
 const registerModalOpen = ref(false);
 const changePasswordModalOpen = ref(false);
+watch(() => props.open, (open) => {
+  if (!props.modalOnly) return;
+  signInModalOpen.value = open === true;
+  if (!open) registerModalOpen.value = false;
+});
+function onDialogOpenChanged(open: boolean): void {
+  if (props.modalOnly && !open) emit('close');
+}
+function onDialogAfterLeave(): void {
+  if (props.modalOnly && !signInModalOpen.value && !registerModalOpen.value) emit('after:leave');
+}
 
 type SessionData = {
   authenticated?: boolean;
@@ -183,6 +201,7 @@ const inviteToken = ref<string | null>(null);
 
 onMounted(() => {
   inviteToken.value = readInviteLinkToken();
+  if (props.modalOnly) return;
   // An invite link is for creating an account: open registration directly.
   if (!isSignedIn.value && isBasicAuthProvider.value && claimInviteLinkAutoOpen()) {
     registerModalOpen.value = true;

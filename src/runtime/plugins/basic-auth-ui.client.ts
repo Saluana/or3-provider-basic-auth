@@ -4,6 +4,7 @@ import { BASIC_AUTH_PROVIDER_ID } from '../lib/constants';
 type AuthUiRegistryInput = {
   id: string;
   component: unknown;
+  signInComponent?: unknown;
 };
 type AuthUiRegistryBridge = {
   $registerAuthUiAdapter?: (input: AuthUiRegistryInput) => void;
@@ -21,7 +22,8 @@ function tryRegisterAuthUiAdapter(component: unknown): boolean {
   }
   nuxtApp.$registerAuthUiAdapter({
     id: BASIC_AUTH_PROVIDER_ID,
-    component
+    component,
+    signInComponent: component
   });
   return true;
 }
@@ -29,7 +31,8 @@ function tryRegisterAuthUiAdapter(component: unknown): boolean {
 function enqueueAuthUiAdapter(component: unknown): void {
   const payload: AuthUiRegistryInput = {
     id: BASIC_AUTH_PROVIDER_ID,
-    component
+    component,
+    signInComponent: component
   };
   const globalState = globalThis as AuthUiRegistryGlobalState;
   if (!Array.isArray(globalState.__or3AuthUiAdapterQueue__)) {
