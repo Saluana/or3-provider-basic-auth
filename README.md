@@ -2,6 +2,9 @@
 
 Basic-auth provider for OR3 Chat SSR mode.
 
+Rejected registration requests preserve existing login cookies, including when
+the request fails the mutation origin policy. Sign-out still clears the session.
+
 Requires **Node.js 24.22.1 or newer on the 24.x line**, matching OR3 Chat. Development and CI pin **24.22.1** in `.node-version`.
 
 This package registers:
