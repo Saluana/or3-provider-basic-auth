@@ -8,7 +8,7 @@ import { createAccount, findAccountByEmail } from '../../../lib/session-store';
 import { resetBasicAuthDbForTests } from '../../../db/client';
 import { resetBasicAuthRateLimitStore } from '../../../lib/rate-limit';
 import { handleSignIn } from '../sign-in.post';
-import { handleRegister } from '../register.post';
+import registerHandler from '../register.post';
 import { handleRefresh } from '../refresh.post';
 import { handleSignOut } from '../sign-out.post';
 import { handleChangePassword } from '../change-password.post';
@@ -183,7 +183,7 @@ describe('basic-auth endpoint flow', () => {
     });
 
     const app = createApp();
-    app.use('/api/basic-auth/register', eventHandler(handleRegister));
+    app.use('/api/basic-auth/register', registerHandler);
     app.use('/api/basic-auth/sign-in', eventHandler(handleSignIn));
     app.use('/api/basic-auth/refresh', eventHandler(handleRefresh));
     app.use('/api/basic-auth/sign-out', eventHandler(handleSignOut));
@@ -218,6 +218,28 @@ describe('basic-auth endpoint flow', () => {
     }
     server = null;
     baseUrl = '';
+  });
+
+  // A rejected cross-origin registration must not expire an existing login.
+  it('preserves the signed-in session after a cross-origin registration attempt', async () => {
+    const jar: CookieJar = new Map();
+    const signedIn = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: baseUrl },
+      body: JSON.stringify({ email: 'user@example.com', password: 'password-1234' })
+    });
+    expect(signedIn.status).toBe(200);
+    applySetCookies(jar, getSetCookies(signedIn));
+    const rejected = await fetch(`${baseUrl}/api/basic-auth/register`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', origin: 'https://untrusted.example', cookie: toCookieHeader(jar) },
+      body: 'email=attacker%40example.com'
+    });
+    expect(rejected.status).toBe(403);
+    expect(getSetCookies(rejected)).toEqual([]);
+    applySetCookies(jar, getSetCookies(rejected));
+    const session = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: toCookieHeader(jar) } });
+    expect((await session.json()).session?.user?.email).toBe('user@example.com');
   });
 
   it('sign-in -> session resolution flow works', async () => {

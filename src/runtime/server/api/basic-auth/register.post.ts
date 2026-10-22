@@ -10,7 +10,7 @@ import {
   type RegistrationDecision,
   type RegistrationMode
 } from '~~/server/auth/registration';
-import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
+import { setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
 import {
   createInvalidRequestError,
@@ -188,11 +188,4 @@ export async function handleRegister(event: H3Event) {
   return { ok: true };
 }
 
-export default defineEventHandler(async (event) => {
-  try {
-    return await handleRegister(event);
-  } catch (error) {
-    clearAuthCookies(event);
-    throw error;
-  }
-});
+export default defineEventHandler(handleRegister);
