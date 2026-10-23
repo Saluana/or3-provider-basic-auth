@@ -27,17 +27,19 @@ declare module '~~/server/auth/registration' {
           | 'invite_required'
           | 'invite_secret_missing'
           | 'invite_invalid'
+          | 'invite_email_mismatch'
           | 'invite_expired'
           | 'invite_unsupported';
       };
 
   export function resolveRegistrationMode(config: ReturnType<typeof useRuntimeConfig>): RegistrationMode;
+  export function getInviteTokenFromEvent(event: H3Event): string | null;
   export function evaluateUnknownUserRegistration(input: {
     event: H3Event;
     store: AuthWorkspaceStore;
     mode: RegistrationMode;
     inviteToken?: string | null;
-  }): RegistrationDecision;
+  }): Promise<RegistrationDecision>;
   export function validateInviteRegistration(input: {
     event: H3Event;
     store: AuthWorkspaceStore;

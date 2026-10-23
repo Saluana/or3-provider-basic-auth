@@ -21,3 +21,6 @@ export const LEGACY_REFRESH_COOKIE_PATH = '/api/basic-auth';
  * instead of being treated as replay attacks (common under HMR remounts).
  */
 export const REFRESH_ROTATION_GRACE_MS = 30_000;
+
+/** One-shot sessionStorage flag: a password change signs the user out and reloads, so the sign-in screen shows the notice. */
+export const PASSWORD_UPDATED_NOTICE_KEY = 'or3:basic-auth-password-updated';

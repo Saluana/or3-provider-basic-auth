@@ -1,5 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { defineEventHandler, type H3Event } from 'h3';
+import { defineEventHandler, setCookie, type H3Event } from 'h3';
+import { useRuntimeConfig } from '#imports';
+import { resolveRegistrationMode, validateInviteRegistration } from '~~/server/auth/registration';
+import { getAuthWorkspaceStore } from '~~/server/auth/store/registry';
 import { z } from 'zod';
 import { clearAuthCookies, setAccessCookie, setRefreshCookie } from '../../lib/cookies';
 import { getBasicAuthConfig } from '../../lib/config';
@@ -22,7 +25,8 @@ import { assertBasicAuthReady, noStore, parseBodyWithSchema } from './_helpers';
 const signInSchema = z.object({
   email: z.string().email().max(320),
   // Sign-in must allow legacy short passwords; strength is enforced at set/change time.
-  password: z.string().min(1).max(512)
+  password: z.string().min(1).max(512),
+  inviteToken: z.string().trim().min(1).max(4096).optional()
 });
 
 const DUMMY_PASSWORD_HASH =
@@ -49,6 +53,15 @@ export async function handleSignIn(event: H3Event) {
     clearAuthCookies(event);
     throw createInvalidCredentialsError();
   }
+
+  // Check a replacement invitation before creating a session. The canonical
+  // acceptance transaction repeats these checks before granting workspace access.
+  const runtimeConfig = useRuntimeConfig();
+  const syncConfig = runtimeConfig as { sync?: { provider?: string }; public?: { sync?: { provider?: string } } };
+  const store = input.inviteToken ? getAuthWorkspaceStore(syncConfig.sync?.provider ?? syncConfig.public?.sync?.provider ?? 'convex') : null;
+  const invitation = input.inviteToken && store
+    ? await validateInviteRegistration({ event, store, mode: resolveRegistrationMode(runtimeConfig), email, inviteToken: input.inviteToken })
+    : null;
 
   const config = getBasicAuthConfig();
   if (config.refreshTtlSeconds <= 0 || config.accessTtlSeconds <= 0) {
@@ -80,6 +93,13 @@ export async function handleSignIn(event: H3Event) {
 
   setAccessCookie(event, accessToken, config.accessTtlSeconds);
   setRefreshCookie(event, refreshToken, config.refreshTtlSeconds);
+
+  if (invitation?.allowed && invitation.invite) {
+    setCookie(event, 'or3_invite_token', input.inviteToken!, {
+      httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production',
+      path: '/', maxAge: Math.min(600, invitation.invite.payload.exp - Math.floor(Date.now() / 1000)),
+    });
+  }
 
   return { ok: true };
 }

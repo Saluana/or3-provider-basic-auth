@@ -1,4 +1,4 @@
-import { defineNuxtPlugin } from '#imports';
+import { defineNuxtPlugin, useRuntimeConfig } from '#imports';
 import { registerClientAuthStatusResolver } from '~/composables/auth/useClientAuthStatus.client';
 import { registerClientSessionRecovery } from '~/composables/auth/useClientSessionRecovery';
 import { silentRefreshOnce } from '../lib/silent-refresh.client';
@@ -13,7 +13,9 @@ type SessionPayload = {
 async function fetchSession(): Promise<SessionPayload | null> {
   try {
     return await $fetch<SessionPayload>('/api/auth/session', {
-      cache: 'no-store'
+      cache: 'no-store',
+      // ofetch would resend a failed GET at once, even after a 429.
+      retry: 0
     });
   } catch {
     return null;
@@ -22,6 +24,9 @@ async function fetchSession(): Promise<SessionPayload | null> {
 
 export default defineNuxtPlugin(() => {
   if (import.meta.server) return;
+  const config = useRuntimeConfig();
+  if (!config.public.ssrAuthEnabled) return;
+  if (config.public.authProvider && config.public.authProvider !== 'basic-auth') return;
 
   registerClientSessionRecovery(async () => silentRefreshOnce());
 

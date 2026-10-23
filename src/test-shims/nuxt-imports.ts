@@ -11,6 +11,10 @@ export function useRuntimeConfig(...args: unknown[]): unknown {
   return getter ? getter(...args) : {};
 }
 
+export function useToast() {
+  return { add: (_toast: unknown) => undefined };
+}
+
 export function useNuxtApp(): Record<string, unknown> {
   return {};
 }

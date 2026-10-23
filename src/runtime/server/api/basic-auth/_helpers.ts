@@ -27,7 +27,7 @@ export async function parseBodyWithSchema<T extends z.ZodTypeAny>(
     const firstIssue = result.error.issues[0];
     const path = firstIssue?.path?.join('.') || 'input';
     const detail = firstIssue?.message || 'Invalid request';
-    if (detail === 'Password must be 72 UTF-8 bytes or fewer.') {
+    if (detail === 'Password is too long. Please shorten it.') {
       throw createError({ statusCode: 400, statusMessage: detail });
     }
     // Prefer actionable messages for common auth fields without dumping full Zod trees.

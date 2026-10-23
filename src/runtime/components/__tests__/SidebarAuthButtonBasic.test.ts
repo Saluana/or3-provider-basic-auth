@@ -5,13 +5,27 @@ import SidebarAuthButtonBasic from '../SidebarAuthButtonBasic.client.vue';
 import BasicAuthUserMenu from '../BasicAuthUserMenu.client.vue';
 import BasicAuthRegisterModal from '../BasicAuthRegisterModal.client.vue';
 import { resetInviteLinkForTests } from '../../lib/invite-link.client';
+import {
+  resetTestSession,
+  setTestRefresh,
+  setTestSession
+} from '../../../test-shims/session-context';
 
 const UButtonStub = defineComponent({
   template: '<button type="button"><slot /></button>'
 });
 
+const signedInSession = {
+  session: {
+    authenticated: true,
+    provider: 'basic-auth',
+    user: { email: 'user@example.com' }
+  }
+};
+
 describe('SidebarAuthButtonBasic', () => {
   beforeEach(() => {
+    resetTestSession();
     (globalThis as typeof globalThis & { useRuntimeConfig?: unknown }).useRuntimeConfig = () => ({
       public: {
         authProvider: 'basic-auth',
@@ -20,19 +34,10 @@ describe('SidebarAuthButtonBasic', () => {
     });
   });
 
-  it('renders login path when signed out', async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/auth/session') {
-        return { session: null };
-      }
-
-      if (url === '/api/basic-auth/refresh?silent=1') {
-        return { ok: false };
-      }
-
-      throw new Error(`Unexpected URL: ${url}`);
-    });
+  it('renders login path when signed out, without fetching its own session', async () => {
+    const fetchMock = vi.fn();
     vi.stubGlobal('$fetch', fetchMock);
+    setTestSession({ session: null });
 
     const wrapper = shallowMount(SidebarAuthButtonBasic, {
       global: {
@@ -48,13 +53,11 @@ describe('SidebarAuthButtonBasic', () => {
     await flushPromises();
 
     expect(wrapper.text()).toContain('Login');
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
-      method: 'POST'
-    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('renders the signed-out action as a more-row when requested by the host', async () => {
-    vi.stubGlobal('$fetch', vi.fn(async () => ({ session: null })));
+    setTestSession({ session: null });
 
     const wrapper = shallowMount(SidebarAuthButtonBasic, {
       props: { layout: 'more-sheet' },
@@ -78,13 +81,7 @@ describe('SidebarAuthButtonBasic', () => {
   });
 
   it('forwards more-sheet layout to the signed-in account menu', async () => {
-    vi.stubGlobal('$fetch', vi.fn(async () => ({
-      session: {
-        authenticated: true,
-        provider: 'basic-auth',
-        user: { email: 'user@example.com' }
-      }
-    })));
+    setTestSession(signedInSession);
 
     const wrapper = shallowMount(SidebarAuthButtonBasic, {
       props: { layout: 'more-sheet' },
@@ -117,7 +114,7 @@ describe('SidebarAuthButtonBasic', () => {
     });
 
     it('opens registration with the token filled in for a signed-out visitor, once per link', async () => {
-      vi.stubGlobal('$fetch', vi.fn(async () => ({ session: null })));
+      setTestSession({ session: null });
       const rail = mountButton();
       const sheet = mountButton('more-sheet');
       await flushPromises();
@@ -128,43 +125,15 @@ describe('SidebarAuthButtonBasic', () => {
     });
 
     it('leaves a signed-in user where they are', async () => {
-      vi.stubGlobal('$fetch', vi.fn(async () => ({
-        session: { authenticated: true, provider: 'basic-auth', user: { email: 'user@example.com' } }
-      })));
+      setTestSession(signedInSession);
       const wrapper = mountButton();
       await flushPromises();
       expect(wrapper.findComponent(BasicAuthRegisterModal).props('modelValue')).toBe(false);
     });
   });
 
-  it('silently refreshes tokens when session endpoint returns null', async () => {
-    let sessionCalls = 0;
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url === '/api/basic-auth/refresh?silent=1') {
-        return { ok: true };
-      }
-
-      if (url === '/api/auth/session') {
-        sessionCalls += 1;
-        if (sessionCalls === 1) {
-          return { session: null };
-        }
-
-        return {
-          session: {
-            authenticated: true,
-            provider: 'basic-auth',
-            user: {
-              email: 'user@example.com'
-            }
-          }
-        };
-      }
-
-      throw new Error(`Unexpected URL: ${url}`);
-    });
-
-    vi.stubGlobal('$fetch', fetchMock);
+  it('shows the account menu once the shared session becomes signed in', async () => {
+    setTestSession({ session: null });
 
     const wrapper = shallowMount(SidebarAuthButtonBasic, {
       global: {
@@ -178,12 +147,41 @@ describe('SidebarAuthButtonBasic', () => {
     });
 
     await flushPromises();
-    await flushPromises();
-    await wrapper.vm.$nextTick();
+    expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(false);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/basic-auth/refresh?silent=1', {
-      method: 'POST'
-    });
+    // The host refreshes the shared session (for example after silent token
+    // recovery); the button follows it without any request of its own.
+    setTestSession(signedInSession);
+    await flushPromises();
+
     expect(wrapper.find('basic-auth-user-menu-stub').exists()).toBe(true);
+  });
+
+  it('announces an auth event and leaves refreshing the shared session to the host', async () => {
+    // The host decides whether to reload by comparing the session before and
+    // after its own refresh, so the button must not refresh it first.
+    setTestSession(signedInSession);
+    const refresh = vi.fn(async () => undefined);
+    setTestRefresh(refresh);
+    const changed = vi.fn();
+    window.addEventListener('or3:auth-session-changed', changed);
+
+    const wrapper = shallowMount(SidebarAuthButtonBasic, {
+      global: {
+        stubs: {
+          UButton: UButtonStub,
+          BasicAuthSignInModal: true,
+          BasicAuthChangePasswordModal: true
+        }
+      }
+    });
+    await flushPromises();
+
+    wrapper.getComponent(BasicAuthUserMenu).vm.$emit('signed-out');
+    await flushPromises();
+    window.removeEventListener('or3:auth-session-changed', changed);
+
+    expect(changed).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
   });
 });

@@ -31,7 +31,7 @@
 
           <USeparator />
 
-          <UFormField label="New Password" name="newPassword" hint="At least 8 characters; at most 72 UTF-8 bytes">
+          <UFormField label="New Password" name="newPassword" hint="Use at least 8 characters">
             <UInput
               v-model="state.newPassword"
               type="password"
@@ -53,8 +53,13 @@
             />
           </UFormField>
 
+          <p class="text-xs opacity-70">
+            For your security, changing your password signs you out on all devices.
+          </p>
+
           <div
             v-if="errorMessage"
+            role="alert"
             class="flex items-start gap-2 rounded-[var(--md-border-radius)] border border-[var(--md-error)]/30 bg-[var(--md-error)]/8 px-3 py-2.5 text-sm text-[var(--md-error)]"
           >
             <UIcon name="i-lucide-alert-circle" class="w-4 h-4 mt-0.5 shrink-0" />
@@ -83,6 +88,7 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref } from 'vue';
+import { PASSWORD_UPDATED_NOTICE_KEY } from '../lib/constants';
 import { newPasswordFitsBcrypt } from '../password-policy';
 
 const modalUi = {
@@ -118,17 +124,44 @@ function close(): void {
   emit('update:modelValue', false);
 }
 
+/** Turns a failed request into a message that says what happened and what to do. */
+function describeError(error: unknown): string {
+  const failure = error as {
+    statusCode?: number;
+    data?: { statusMessage?: string };
+    response?: { headers?: { get?: (name: string) => string | null } };
+  } | null;
+  const status = Number(failure?.statusCode);
+  const serverMessage = failure?.data?.statusMessage;
+
+  if (status === 401) {
+    return serverMessage === 'Session expired'
+      ? 'Your session has expired. Sign in again to change your password.'
+      : 'Your current password is incorrect.';
+  }
+  if (status === 429) {
+    const seconds = Number(failure?.response?.headers?.get?.('retry-after'));
+    return seconds > 0
+      ? `Too many attempts. Try again in ${seconds} seconds.`
+      : 'Too many attempts. Please wait a minute and try again.';
+  }
+  if (status === 400 && serverMessage && serverMessage !== 'Invalid request') {
+    return serverMessage;
+  }
+  return 'Unable to change password right now. Please try again.';
+}
+
 async function onSubmit(): Promise<void> {
   if (state.newPassword.length < 8) {
     errorMessage.value = 'New password must be at least 8 characters.';
     return;
   }
   if (!newPasswordFitsBcrypt(state.newPassword)) {
-    errorMessage.value = 'New password must be 72 UTF-8 bytes or fewer.';
+    errorMessage.value = 'Password is too long. Please shorten it.';
     return;
   }
   if (state.newPassword !== state.confirmNewPassword) {
-    errorMessage.value = 'Passwords do not match';
+    errorMessage.value = 'Passwords must match.';
     return;
   }
 
@@ -145,10 +178,15 @@ async function onSubmit(): Promise<void> {
       }
     });
 
+    try {
+      sessionStorage.setItem(PASSWORD_UPDATED_NOTICE_KEY, '1');
+    } catch {
+      // The notice is a courtesy; private modes may block storage.
+    }
     emit('updated');
     close();
-  } catch {
-    errorMessage.value = 'Unable to change password';
+  } catch (error) {
+    errorMessage.value = describeError(error);
   } finally {
     pending.value = false;
   }
