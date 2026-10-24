@@ -5,6 +5,13 @@ Basic-auth provider for OR3 Chat SSR mode.
 Rejected registration requests preserve existing login cookies, including when
 the request fails the mutation origin policy. Sign-out still clears the session.
 
+After credentials are accepted, OR3 Chat loads the canonical workspace session.
+Updated hosts show a persistent **Unable to load your account** notification
+with **Retry** if that step fails. Retry reuses the accepted credentials, so a
+temporary workspace-service outage does not require registering again or
+resubmitting a password. Local Convex development requires its backend to remain
+running alongside OR3 Chat. This recovery feedback is provided by the host.
+
 Requires **Node.js 24.22.1 or newer on the 24.x line**, matching OR3 Chat. Development and CI pin **24.22.1** in `.node-version`.
 
 This package registers:
