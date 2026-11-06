@@ -12,11 +12,11 @@ import {
   isBasicAuthInsecureDevEscapeHatchEnabled,
   validateBasicAuthConfig
 } from '../lib/config';
-import { hashPassword } from '../lib/password';
+import { hashPasswordSync } from '../lib/password';
 import { ensureBootstrapAccount, findAccountByEmail } from '../lib/session-store';
 import { basicAuthAdminAdapter } from '../admin/adapters/auth-basic-auth';
 
-async function ensureBootstrapUserIfConfigured(): Promise<void> {
+function ensureBootstrapUserIfConfigured(): void {
   const config = getBasicAuthConfig();
   const email = config.bootstrapEmail?.trim();
   const password = config.bootstrapPassword;
@@ -29,7 +29,7 @@ async function ensureBootstrapUserIfConfigured(): Promise<void> {
     return;
   }
 
-  const passwordHash = await hashPassword(password);
+  const passwordHash = hashPasswordSync(password);
   ensureBootstrapAccount({
     email,
     passwordHash,
@@ -37,7 +37,7 @@ async function ensureBootstrapUserIfConfigured(): Promise<void> {
   });
 }
 
-export default defineNitroPlugin(async () => {
+export default defineNitroPlugin(() => {
   const runtimeConfig = useRuntimeConfig();
   const diagnostics = validateBasicAuthConfig(runtimeConfig);
 
@@ -65,6 +65,10 @@ export default defineNitroPlugin(async () => {
     throw new Error(message);
   }
 
+  // Nitro 2 does not await plugin promises. Finish bootstrap before the server
+  // can accept requests, and let startup errors propagate synchronously.
+  ensureBootstrapUserIfConfigured();
+
   registerAuthProvider({
     id: BASIC_AUTH_PROVIDER_ID,
     order: 100,
@@ -73,8 +77,4 @@ export default defineNitroPlugin(async () => {
 
   registerProviderTokenBroker(BASIC_AUTH_PROVIDER_ID, createBasicAuthTokenBroker);
   registerProviderAdminAdapter(basicAuthAdminAdapter);
-
-  // Nitro 2 invokes plugins synchronously, so registration must happen before
-  // the first await for strict provider validation to observe this provider.
-  await ensureBootstrapUserIfConfigured();
 });

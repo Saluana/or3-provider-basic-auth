@@ -198,6 +198,12 @@ Optional:
 - `OR3_BASIC_AUTH_ALLOW_INSECURE_DEV` (`true` in non-production to start with missing secrets instead of failing)
 - `OR3_PLUGIN_DEV_COOKIE_SCOPE` (set by the isolated plugin development launcher to keep browser sessions separate across local hosts)
 
+When both bootstrap values are set, the first account is created before the
+server accepts requests. An existing account is preserved on restart; changing
+the bootstrap password does not reset it. Bootstrap errors stop startup rather
+than leaving the server available with an unusable initial login. Request-time
+password hashing remains asynchronous.
+
 Registration mode is a core-auth policy, not a provider setting:
 
 - `OR3_AUTH_REGISTRATION_MODE=open|invite_only|disabled`
