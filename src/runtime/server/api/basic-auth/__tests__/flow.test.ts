@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHash, createHmac } from 'node:crypto';
-import { createServer } from 'node:http';
+import { createServer, request } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createApp, eventHandler, toNodeListener, type H3Event } from 'h3';
 import { hashPassword } from '../../../lib/password';
@@ -218,6 +218,91 @@ describe('basic-auth endpoint flow', () => {
     }
     server = null;
     baseUrl = '';
+  });
+
+  // Body-boundary failures: trust in Content-Length alone misses chunked bodies;
+  // character counts miss multibyte bytes; destroying the socket too early hides
+  // the 413; buffering until end lets a client keep the auth request alive.
+  it.each(['sign-in', 'register'])('rejects oversized %s bodies before waiting for the upload to finish', async (endpoint) => {
+    for (const framing of ['declared', 'chunked'] as const) {
+      const result = await new Promise<{ status: number; body: string }>((resolve, reject) => {
+        const upload = request(`${baseUrl}/api/basic-auth/${endpoint}`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(framing === 'declared'
+              ? { 'content-length': String(16 * 1024 + 1) }
+              : { 'transfer-encoding': 'chunked' })
+          }
+        }, (response) => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', (chunk: string) => { body += chunk; });
+          response.on('end', () => {
+            resolve({ status: response.statusCode!, body });
+            upload.destroy();
+          });
+          response.on('error', reject);
+        });
+        upload.on('error', reject);
+        upload.setTimeout(2000, () => upload.destroy(new Error('Authentication waited for an oversized upload to finish')));
+        upload.flushHeaders();
+        // Fewer than 16 Ki characters, but more than 16 KiB of UTF-8 bytes.
+        // Do not end the request: the limit must reject while it is streaming.
+        if (framing === 'chunked') upload.write('é'.repeat(9 * 1024));
+      });
+      expect(result.status).toBe(413);
+      expect(result.body).toContain('The request body is too large.');
+    }
+  });
+
+  it.each([
+    { type: 'application/json', body: JSON.stringify({ email: 'user@example.com', password: 'password-1234' }) },
+    { type: 'application/json; charset=utf-8', body: JSON.stringify({ email: 'user@example.com', password: 'password-1234' }) },
+    { type: 'application/x-www-form-urlencoded', body: 'email=user%40example.com&password=password-1234' }
+  ])('preserves successful $type sign-in parsing', async ({ type, body }) => {
+    const response = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
+      method: 'POST',
+      headers: { 'content-type': type, origin: baseUrl },
+      body: type.startsWith('application/json') ? body.padEnd(16 * 1024, ' ') : body
+    });
+    expect(response.status).toBe(200);
+    const jar: CookieJar = new Map();
+    applySetCookies(jar, getSetCookies(response));
+    const session = await fetch(`${baseUrl}/api/auth/session`, { headers: { cookie: toCookieHeader(jar) } });
+    expect((await session.json()).session?.user?.email).toBe('user@example.com');
+  });
+
+  it('rejects malformed JSON and duplicate form credentials without creating a session', async () => {
+    for (const input of [
+      { type: 'application/json', body: '{"email":' },
+      { type: 'application/x-www-form-urlencoded', body: 'email=user%40example.com&email=other%40example.com&password=password-1234' }
+    ]) {
+      const response = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
+        method: 'POST',
+        headers: { 'content-type': input.type },
+        body: input.body
+      });
+      expect(response.status).toBe(400);
+      expect(getSetCookies(response)).toEqual([]);
+    }
+  });
+
+  it('recovers after an interrupted authentication upload', async () => {
+    await new Promise<void>((resolve) => {
+      const upload = request(`${baseUrl}/api/basic-auth/sign-in`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'transfer-encoding': 'chunked' }
+      });
+      upload.on('error', () => {});
+      upload.on('close', resolve);
+      upload.write('{"email":', () => upload.destroy());
+    });
+    const response = await fetch(`${baseUrl}/api/basic-auth/sign-in`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ email: 'user@example.com', password: 'password-1234' })
+    });
+    expect(response.status).toBe(200);
+    expect(getSetCookies(response).some(cookie => cookie.startsWith('or3_access='))).toBe(true);
   });
 
   // A rejected cross-origin registration must not expire an existing login.

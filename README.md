@@ -5,6 +5,11 @@ Basic-auth provider for OR3 Chat SSR mode.
 Rejected registration requests preserve existing login cookies, including when
 the request fails the mutation origin policy. Sign-out still clears the session.
 
+Sign-in, registration, and password-change request bodies are limited to **16 KiB**
+before parsing. Both declared and streamed bodies over that limit receive HTTP
+`413`; incomplete oversized uploads are closed after the response. Existing JSON
+and URL-encoded form requests retain their parsing and validation behavior.
+
 After credentials are accepted, OR3 Chat loads the canonical workspace session.
 Updated hosts show a persistent **Unable to load your account** notification
 with **Retry** if that step fails. Retry reuses the accepted credentials, so a

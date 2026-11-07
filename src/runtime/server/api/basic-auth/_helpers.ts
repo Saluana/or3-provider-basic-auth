@@ -1,8 +1,51 @@
 import { useRuntimeConfig } from '#imports';
-import { createError, readBody, setResponseHeader, type H3Event } from 'h3';
+import { createError, getHeader, readBody, setResponseHeader, type H3Event } from 'h3';
 import type { z } from 'zod';
 import { validateBasicAuthConfig } from '../../lib/config';
 import { createAuthNotConfiguredError, createInvalidRequestError } from '../../lib/errors';
+
+// Credentials and invitation tokens are control messages, never file uploads.
+const AUTH_BODY_LIMIT_BYTES = 16 * 1024;
+
+function payloadTooLarge(event: H3Event) {
+  // Finish the 413 response before closing an unfinished upload. Destroying the
+  // request immediately would reset the socket and hide the response.
+  event.node.res.shouldKeepAlive = false;
+  event.node.req.pause();
+  return createError({ statusCode: 413, statusMessage: 'The request body is too large.' });
+}
+
+async function readLimitedBody(event: H3Event): Promise<unknown> {
+  const declared = getHeader(event, 'content-length');
+  if (declared !== undefined) {
+    const length = Number(declared);
+    if (!Number.isSafeInteger(length) || length < 0 || length > AUTH_BODY_LIMIT_BYTES) {
+      throw payloadTooLarge(event);
+    }
+  }
+
+  const chunks: Buffer[] = [];
+  let length = 0;
+  try {
+    // Basic Auth's SQLite runtime is Node-only. Keep the socket available for
+    // an HTTP error response when we stop consuming an oversized request.
+    const stream = event.node.req.iterator({ destroyOnReturn: false }) as AsyncIterable<Uint8Array | string>;
+    for await (const chunk of stream) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      length += bytes.byteLength;
+      if (length > AUTH_BODY_LIMIT_BYTES) throw payloadTooLarge(event);
+      chunks.push(bytes);
+    }
+  } catch (error) {
+    if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 413) throw error;
+    throw createInvalidRequestError();
+  }
+
+  // Give h3 only the bounded bytes, retaining its JSON and form parsing rules
+  // (including duplicate form fields) instead of maintaining another decoder.
+  event._requestBody = new Uint8Array(Buffer.concat(chunks, length));
+  return readBody(event);
+}
 
 export function assertBasicAuthReady(event: H3Event): void {
   const diagnostics = validateBasicAuthConfig(useRuntimeConfig(event));
@@ -20,7 +63,7 @@ export async function parseBodyWithSchema<T extends z.ZodTypeAny>(
   event: H3Event,
   schema: T
 ): Promise<z.infer<T>> {
-  const body = await readBody(event);
+  const body = await readLimitedBody(event);
   const result = schema.safeParse(body);
 
   if (!result.success) {
