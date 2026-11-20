@@ -31,6 +31,25 @@ describe('basic auth client adapters', () => {
     expect(registerRecovery).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [new Error('Connection lost'), false],
+    [Object.assign(new Error('Too many requests'), { status: 429 }), true]
+  ])('reports indeterminate after a failed session probe (%s)', async (failure, afterRecovery) => {
+    vi.stubGlobal('useRuntimeConfig', () => ({
+      public: { ssrAuthEnabled: true, authProvider: 'basic-auth' }
+    }));
+    const fetch = vi.fn().mockResolvedValue({ ok: false });
+    if (afterRecovery) fetch.mockResolvedValueOnce({ session: null }).mockResolvedValueOnce({ ok: true });
+    fetch.mockRejectedValueOnce(failure);
+    vi.stubGlobal('$fetch', fetch);
+    const { default: setup } = await import('../auth-status.client');
+    setup();
+
+    await expect(registerStatus.mock.calls[0][0]()).resolves.toEqual({
+      ready: true, authenticated: undefined
+    });
+  });
+
   it('recovers a Basic auth session and reports its authenticated status when selected', async () => {
     vi.stubGlobal('useRuntimeConfig', () => ({
       public: { ssrAuthEnabled: true, authProvider: 'basic-auth' }

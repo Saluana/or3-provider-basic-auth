@@ -1,7 +1,7 @@
 declare module '~/composables/auth/useClientAuthStatus.client' {
   export interface ClientAuthStatus {
     ready: boolean;
-    authenticated: boolean;
+    authenticated: boolean | undefined;
   }
 
   export type ClientAuthStatusResolver = () =>
