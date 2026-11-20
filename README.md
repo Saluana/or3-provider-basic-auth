@@ -358,7 +358,7 @@ The updated host and SQLite or Convex store must provide short-code resolution. 
 
 ### Session and account feedback
 
-The sidebar reads the host's shared session and emits `or3:auth-session-changed` after sign-in, registration, sign-out, or a password change. The host owns refreshing the session and deciding whether account changes require a reload. Session probes disable automatic request retries.
+The sidebar reads the host's shared session and emits `or3:auth-session-changed` after sign-in, registration, sign-out, or a password change. The host owns refreshing the session and deciding whether account changes require a reload. After sign-in from a signed-out page, the host can defer publishing the session until the reload so the new page starts sync once. It publishes confirmed sign-outs and account or workspace switches before reload so local cleanup can run. Session probes disable automatic request retries and report an indeterminate status when the session endpoint fails. If the auth-change refresh is rate-limited, its notification displays the server’s retry window and permits retry after it ends.
 
 Invite-only registration marks the code as required before submission. Invalid or expired invitation messages explain the next step for the current registration mode. Sign-out also clears the pending invitation cookie so it cannot apply to another signup. Password changes explain that all sessions are revoked, report incorrect-password and rate-limit errors, and show a one-time confirmation on the sign-in screen.
 

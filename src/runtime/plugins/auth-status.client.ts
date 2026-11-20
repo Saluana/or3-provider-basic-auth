@@ -32,7 +32,8 @@ export default defineNuxtPlugin(() => {
 
   registerClientAuthStatusResolver(async () => {
     const first = await fetchSession();
-    const firstSession = first?.session;
+    if (!first) return { ready: true, authenticated: undefined };
+    const firstSession = first.session;
 
     if (
       firstSession?.authenticated === true &&
@@ -49,7 +50,8 @@ export default defineNuxtPlugin(() => {
     }
 
     const second = await fetchSession();
-    const secondSession = second?.session;
+    if (!second) return { ready: true, authenticated: undefined };
+    const secondSession = second.session;
     const authenticated =
       secondSession?.authenticated === true &&
       secondSession.provider === 'basic-auth';
