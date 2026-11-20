@@ -362,4 +362,4 @@ The sidebar reads the host's shared session and emits `or3:auth-session-changed`
 
 Invite-only registration marks the code as required before submission. Invalid or expired invitation messages explain the next step for the current registration mode. Sign-out also clears the pending invitation cookie so it cannot apply to another signup. Password changes explain that all sessions are revoked, report incorrect-password and rate-limit errors, and show a one-time confirmation on the sign-in screen.
 
-These source changes require a new provider package release and a coordinated host dependency pin. The existing `0.0.13` package does not include them.
+Indeterminate session status requires `or3-provider-basic-auth@0.0.21` or later and a host that handles the indeterminate result.
