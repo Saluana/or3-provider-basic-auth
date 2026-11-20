@@ -20,7 +20,8 @@ function applyRuntimeConfigStub() {
 
 describe('jwt helpers', () => {
   beforeEach(() => {
-    vi.useRealTimers();
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
     process.env.OR3_BASIC_AUTH_JWT_SECRET = 'test-jwt-secret';
     process.env.OR3_BASIC_AUTH_REFRESH_SECRET = 'test-refresh-secret';
     process.env.OR3_BASIC_AUTH_ACCESS_TTL_SECONDS = '1';
@@ -31,6 +32,7 @@ describe('jwt helpers', () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     delete process.env.OR3_PLUGIN_DEV_COOKIE_SCOPE;
   });
 
@@ -51,9 +53,6 @@ describe('jwt helpers', () => {
   });
 
   it('rejects access token after expiry', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
-
     const token = await signAccessToken({
       sub: 'user-1',
       sid: 'session-1',
